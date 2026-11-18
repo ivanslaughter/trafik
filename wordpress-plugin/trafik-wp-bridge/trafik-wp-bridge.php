@@ -3,7 +3,7 @@
  * Plugin Name: Trafik WP Bridge
  * Plugin URI: https://trafik.velocity.web.id
  * Description: Menjembatani aplikasi Trafik (React SPA) dengan database MySQL/MariaDB & autentikasi pengguna WordPress via REST API (/wp-json/trafik/v1).
- * Version: 1.0.0
+ * Version: 1.1.0
  * Author: Velocity Digital
  * Author URI: https://velocity.web.id
  * License: GPLv2 or later
@@ -14,8 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TRAFIK_BRIDGE_VERSION', '1.0.0');
-define('TRAFIK_BRIDGE_DB_VERSION', '1.0.0');
+define('TRAFIK_BRIDGE_VERSION', '1.1.0');
+define('TRAFIK_BRIDGE_DB_VERSION', '1.1.0');
 
 /**
  * 1. ACTIVATION & DATABASE SCHEMA (MySQL / MariaDB)
@@ -49,6 +49,8 @@ function trafik_bridge_install() {
         audit_notes text DEFAULT NULL,
         reported_count int(11) NOT NULL DEFAULT 0,
         submitted_by_user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+        iframe_allowed tinyint(1) NOT NULL DEFAULT 1,
+        referrer_policy varchar(16) NOT NULL DEFAULT 'direct',
         preview_content longtext DEFAULT NULL,
         created_at date NOT NULL,
         PRIMARY KEY  (id),
@@ -330,6 +332,8 @@ function trafik_bridge_format_campaign($row) {
         'auditNotes'          => $row->audit_notes ?: '',
         'reportedCount'       => (int) $row->reported_count,
         'submittedByUserId'   => $row->submitted_by_user_id ? ('wp_' . (int) $row->submitted_by_user_id) : '',
+        'iframeAllowed'       => isset($row->iframe_allowed) ? ((int) $row->iframe_allowed === 1) : true,
+        'referrerPolicy'      => !empty($row->referrer_policy) ? $row->referrer_policy : 'direct',
         'previewContent'      => $preview,
     ];
 }
@@ -342,6 +346,261 @@ function trafik_bridge_parse_wp_uid($raw_id) {
         return (int) substr($raw_id, 3);
     }
     return 0;
+}
+
+/**
+ * 4B. SERVER-SIDE COMPLIANCE SCANNER & LIVE URL HEADER PROBE (wp_remote_get)
+ */
+function trafik_bridge_normalize_text($input) {
+    if (empty($input)) {
+        return '';
+    }
+    $text = mb_strtolower((string) $input, 'UTF-8');
+    $text = strtr($text, [
+        '0' => 'o',
+        '1' => 'i',
+        '3' => 'e',
+        '4' => 'a',
+        '5' => 's',
+        '8' => 'b',
+        '@' => 'a',
+        '$' => 's',
+    ]);
+    return preg_replace('/[\-_.\s]+/', ' ', $text);
+}
+
+function trafik_bridge_audit_text_compliance($url, $title = '', $description = '', $body_text = '') {
+    $judi_keywords = [
+        'slot', 'gacor', 'maxwin', 'zeus', 'pragmatic', 'mahjong', 'depo',
+        'deposit pulsa', 'wd', 'withdraw', 'togel', 'toto macau', 'judi bola',
+        'sbobet', 'poker', 'dominoqq', 'bandarqq', 'ceme', 'jackpot slot',
+        'rtp slot', 'link gacor', 'agen judi', 'taruhan', 'live casino',
+        'roulette', 'baccarat', 'scatter hitam', 'kakek zeus', 'olympus',
+        'spadegaming', 'habanero', 'pgsoft', 'judi', 'judi online', 'judol',
+        'judislot', 'bandar togel', 'agen slot', 'situs slot', 'slot gacor',
+        'slot88', 'slot77', 'slot138', 'slot pragmatic', 'kasino online',
+    ];
+
+    $adult_keywords = [
+        'bokep', 'porn', 'xxx', 'dewasa 18+', '18+', 'lendir', 'jav',
+        'onlyfans', 'sex', 'hentai', 'camfrog', 'open bo', 'vcs', 'pornhub',
+        'xhamster', 'bugil', 'mesum', 'desah', 'colmek', 'crot', 'sange',
+        'ngentot', 'becekan', 'stw hot', 'tante girang', 'video bokep',
+        'abg mesum', 'cerita dewasa', 'foto bugil', 'telanjang', 'dildo',
+        'masturbasi', 'porno', 'pornografi', 'fetish', 'bbw hot', 'leaked onlyfans',
+    ];
+
+    $url_lower    = mb_strtolower((string) $url, 'UTF-8');
+    $combined_raw = mb_strtolower($url . ' ' . $title . ' ' . $description . ' ' . $body_text, 'UTF-8');
+    $normalized   = trafik_bridge_normalize_text($combined_raw);
+
+    $detected   = [];
+    $violations = [];
+    $risk_score = 0;
+
+    foreach ($judi_keywords as $kw) {
+        $kw_norm = trafik_bridge_normalize_text($kw);
+        $pattern = '/\b' . preg_quote($kw_norm, '/') . '\b/i';
+        if (preg_match($pattern, $normalized) || strpos($url_lower, $kw) !== false) {
+            if (!in_array($kw, $detected, true)) {
+                $detected[] = $kw;
+            }
+            if (!in_array('JUDI_ONLINE', $violations, true)) {
+                $violations[] = 'JUDI_ONLINE';
+            }
+            $risk_score += 35;
+        }
+    }
+
+    foreach ($adult_keywords as $kw) {
+        $kw_norm = trafik_bridge_normalize_text($kw);
+        $pattern = '/\b' . preg_quote($kw_norm, '/') . '\b/i';
+        if (preg_match($pattern, $normalized) || strpos($url_lower, $kw) !== false) {
+            if (!in_array($kw, $detected, true)) {
+                $detected[] = $kw;
+            }
+            if (!in_array('ADULT_18_PLUS', $violations, true)) {
+                $violations[] = 'ADULT_18_PLUS';
+            }
+            $risk_score += 45;
+        }
+    }
+
+    $parsed_host = parse_url($url_lower, PHP_URL_HOST);
+    if (!empty($parsed_host)) {
+        foreach (['slot', 'gacor', 'togel', 'maxwin'] as $bad_host_kw) {
+            if (strpos($parsed_host, $bad_host_kw) !== false) {
+                $risk_score += 50;
+                if (!in_array('JUDI_ONLINE', $violations, true)) {
+                    $violations[] = 'JUDI_ONLINE';
+                }
+                $label = 'Host: ' . $parsed_host;
+                if (!in_array($label, $detected, true)) {
+                    $detected[] = $label;
+                }
+                break;
+            }
+        }
+        foreach (['bokep', 'porn', 'xxx'] as $bad_host_kw) {
+            if (strpos($parsed_host, $bad_host_kw) !== false) {
+                $risk_score += 50;
+                if (!in_array('ADULT_18_PLUS', $violations, true)) {
+                    $violations[] = 'ADULT_18_PLUS';
+                }
+                $label = 'Host: ' . $parsed_host;
+                if (!in_array($label, $detected, true)) {
+                    $detected[] = $label;
+                }
+                break;
+            }
+        }
+    }
+
+    $final_score = min(100, $risk_score);
+    $passed      = ($final_score < 30 && empty($violations));
+
+    $reason = 'Website lolos pemindaian kepatuhan konten (live HTML & metadata bersih dari judi online / 18+).';
+    if (!$passed) {
+        $labels = [];
+        foreach ($violations as $v) {
+            if ($v === 'JUDI_ONLINE') {
+                $labels[] = 'Judi Online / Slot Gacor (Melanggar UU ITE No. 1/2024)';
+            } elseif ($v === 'ADULT_18_PLUS') {
+                $labels[] = 'Konten Dewasa 18+ / Pornografi (Melanggar UU No. 44/2008)';
+            }
+        }
+        $reason = 'DITOLAK SERVER: Terdeteksi pelanggaran ' . implode(' & ', $labels) . '. Kata kunci: ' . implode(', ', array_slice($detected, 0, 5)) . '.';
+    }
+
+    return [
+        'passed'           => $passed,
+        'riskScore'        => $final_score,
+        'violations'       => $violations,
+        'detectedKeywords' => $detected,
+        'reason'           => $reason,
+        'auditTimestamp'   => gmdate('c'),
+    ];
+}
+
+function trafik_bridge_is_public_url($url) {
+    $parts = wp_parse_url($url);
+    if (empty($parts['scheme']) || !in_array(strtolower($parts['scheme']), ['http', 'https'], true)) {
+        return false;
+    }
+    $host = strtolower($parts['host'] ?? '');
+    if (empty($host) || $host === 'localhost' || substr($host, -6) === '.local') {
+        return false;
+    }
+    $ip = gethostbyname($host);
+    if (filter_var($ip, FILTER_VALIDATE_IP)) {
+        // Block private/reserved IPv4 ranges to prevent SSRF
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+function trafik_bridge_probe_website($url, $submitted_title = '') {
+    $iframe_allowed      = true;
+    $frame_reason        = 'Header situs mengizinkan tayangan Live Iframe.';
+    $reachable           = false;
+    $http_status         = 0;
+    $fetched_title       = '';
+    $fetched_description = '';
+    $body_text           = '';
+
+    if (trafik_bridge_is_public_url($url)) {
+        $response = wp_remote_get($url, [
+            'timeout'     => 8,
+            'redirection' => 3,
+            'sslverify'   => false,
+            'user-agent'  => 'Mozilla/5.0 (compatible; TrafikComplianceBot/1.1; +https://trafik.velocity.web.id)',
+        ]);
+
+        if (!is_wp_error($response)) {
+            $http_status = (int) wp_remote_retrieve_response_code($response);
+            $reachable   = ($http_status > 0 && $http_status < 500);
+            $headers     = wp_remote_retrieve_headers($response);
+
+            $xfo = '';
+            $csp = '';
+            if (is_object($headers) && method_exists($headers, 'getAll')) {
+                $all_headers = $headers->getAll();
+                $xfo = is_array($all_headers['x-frame-options'] ?? null)
+                    ? implode(' ', $all_headers['x-frame-options'])
+                    : (string) ($all_headers['x-frame-options'] ?? '');
+                $csp = is_array($all_headers['content-security-policy'] ?? null)
+                    ? implode(' ', $all_headers['content-security-policy'])
+                    : (string) ($all_headers['content-security-policy'] ?? '');
+            } else {
+                $xfo = (string) wp_remote_retrieve_header($response, 'x-frame-options');
+                $csp = (string) wp_remote_retrieve_header($response, 'content-security-policy');
+            }
+
+            $xfo_upper = strtoupper(trim($xfo));
+            if (strpos($xfo_upper, 'DENY') !== false || strpos($xfo_upper, 'SAMEORIGIN') !== false) {
+                $iframe_allowed = false;
+                $frame_reason   = "Header X-Frame-Options ({$xfo_upper}) memblokir iframe — otomatis dialihkan ke Mode Tab Terkontrol (Hybrid) agar Google Analytics tetap mencatat kunjungan.";
+            }
+
+            if ($iframe_allowed && !empty($csp) && preg_match('/frame-ancestors\s+([^;]+)/i', $csp, $m)) {
+                $ancestors = strtolower(trim($m[1]));
+                if (strpos($ancestors, '*') === false && strpos($ancestors, 'trafik.velocity.web.id') === false) {
+                    $iframe_allowed = false;
+                    $frame_reason   = 'Header CSP frame-ancestors membatasi embed iframe — otomatis menggunakan Mode Tab Terkontrol (Hybrid).';
+                }
+            }
+
+            $raw_html = (string) wp_remote_retrieve_body($response);
+            if (!empty($raw_html)) {
+                if (preg_match('/<title[^>]*>(.*?)<\/title>/is', $raw_html, $tm)) {
+                    $fetched_title = trim(html_entity_decode(wp_strip_all_tags($tm[1]), ENT_QUOTES, 'UTF-8'));
+                }
+                if (preg_match('/<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']/is', $raw_html, $dm)) {
+                    $fetched_description = trim(html_entity_decode($dm[1], ENT_QUOTES, 'UTF-8'));
+                } elseif (preg_match('/<meta[^>]+content=["\']([^"\']+)["\'][^>]+name=["\']description["\']/is', $raw_html, $dm2)) {
+                    $fetched_description = trim(html_entity_decode($dm2[1], ENT_QUOTES, 'UTF-8'));
+                }
+
+                // Strip scripts/styles and inspect visible body text (capped at 15,000 chars)
+                $clean_html = preg_replace('#<(script|style|noscript)[^>]*>.*?</\1>#is', ' ', $raw_html);
+                $body_text  = mb_substr(trim(preg_replace('/\s+/', ' ', wp_strip_all_tags($clean_html))), 0, 15000, 'UTF-8');
+            }
+        } else {
+            $frame_reason = 'Server target tidak dapat dipindai cepat (' . $response->get_error_message() . '); menggunakan Live Iframe default dengan fallback tab.';
+        }
+    }
+
+    // Known major platforms that refuse standard watch-URL iframes
+    $url_lower = strtolower($url);
+    if (
+        strpos($url_lower, 'youtube.com/watch') !== false ||
+        strpos($url_lower, 'youtu.be/') !== false ||
+        strpos($url_lower, 'instagram.com/') !== false ||
+        strpos($url_lower, 'tiktok.com/') !== false ||
+        strpos($url_lower, 'facebook.com/') !== false
+    ) {
+        $iframe_allowed = false;
+        $frame_reason   = 'Platform video/sosial media memblokir iframe standar — otomatis menggunakan Mode Tab Terkontrol (Hybrid).';
+    }
+
+    $compliance = trafik_bridge_audit_text_compliance(
+        $url,
+        trim($submitted_title . ' ' . $fetched_title),
+        $fetched_description,
+        $body_text
+    );
+
+    return [
+        'reachable'          => $reachable,
+        'httpStatus'         => $http_status,
+        'iframeAllowed'      => $iframe_allowed,
+        'frameReason'        => $frame_reason,
+        'fetchedTitle'       => $fetched_title,
+        'fetchedDescription' => $fetched_description,
+        'compliance'         => $compliance,
+    ];
 }
 
 /**
@@ -580,6 +839,24 @@ add_action('rest_api_init', function () {
         },
     ]);
 
+    // Live Website Probe (wp_remote_get HTML compliance scan + X-Frame-Options check)
+    register_rest_route($ns, '/websites/probe', [
+        'methods'             => 'POST',
+        'permission_callback' => 'trafik_bridge_permission_user',
+        'callback'            => function (WP_REST_Request $request) {
+            $params = $request->get_json_params() ?: [];
+            $url    = esc_url_raw($params['url'] ?? '');
+            $title  = sanitize_text_field($params['title'] ?? '');
+
+            if (empty($url) || !preg_match('/^https?:\/\//i', $url)) {
+                return new WP_Error('invalid_url', 'URL website harus diawali http:// atau https://', ['status' => 400]);
+            }
+
+            $probe = trafik_bridge_probe_website($url, $title);
+            return rest_ensure_response($probe);
+        },
+    ]);
+
     // Websites Collection (GET / POST)
     register_rest_route($ns, '/websites', [
         [
@@ -617,11 +894,44 @@ add_action('rest_api_init', function () {
                 $uid    = (int) $user->ID;
                 $params = $request->get_json_params() ?: [];
 
+                $url       = esc_url_raw($params['url'] ?? '');
+                $title     = sanitize_text_field($params['title'] ?? 'Website Tanpa Judul');
                 $allocated = max(0, floatval($params['allocatedPoints'] ?? 0));
                 $cur_pts   = floatval(get_user_meta($uid, 'tn_traffic_points', true));
 
+                if (empty($url) || !preg_match('/^https?:\/\//i', $url)) {
+                    return new WP_Error('invalid_url', 'URL website tidak valid.', ['status' => 400]);
+                }
+
                 if ($cur_pts < $allocated) {
                     return new WP_Error('insufficient_points', 'Saldo poin tidak mencukupi untuk alokasi website ini.', ['status' => 400]);
+                }
+
+                // Server-side live webpage crawl (wp_remote_get) + compliance enforcement
+                $probe = trafik_bridge_probe_website($url, $title);
+                if (empty($probe['compliance']['passed'])) {
+                    return new WP_Error(
+                        'compliance_rejected',
+                        $probe['compliance']['reason'],
+                        [
+                            'status'           => 422,
+                            'detectedKeywords' => $probe['compliance']['detectedKeywords'],
+                            'riskScore'        => $probe['compliance']['riskScore'],
+                        ]
+                    );
+                }
+
+                $iframe_allowed  = isset($params['iframeAllowed']) ? ((bool) $params['iframeAllowed'] && (bool) $probe['iframeAllowed']) : (bool) $probe['iframeAllowed'];
+                $referrer_policy = ($params['referrerPolicy'] ?? 'direct') === 'referral' ? 'referral' : 'direct';
+
+                $preview_content = $params['previewContent'] ?? null;
+                if (is_array($preview_content) && (!empty($probe['fetchedTitle']) || !empty($probe['fetchedDescription']))) {
+                    if (!empty($probe['fetchedTitle'])) {
+                        $preview_content['headline'] = $probe['fetchedTitle'];
+                    }
+                    if (!empty($probe['fetchedDescription'])) {
+                        $preview_content['description'] = $probe['fetchedDescription'];
+                    }
                 }
 
                 $site_id = 'site_' . substr(md5(uniqid((string) wp_rand(), true)), 0, 9);
@@ -629,8 +939,8 @@ add_action('rest_api_init', function () {
 
                 $inserted = $wpdb->insert($table, [
                     'id'                    => $site_id,
-                    'title'                 => sanitize_text_field($params['title'] ?? 'Website Tanpa Judul'),
-                    'url'                   => esc_url_raw($params['url'] ?? ''),
+                    'title'                 => $title,
+                    'url'                   => $url,
                     'category'              => sanitize_text_field($params['category'] ?? 'blog'),
                     'duration_sec'          => max(10, intval($params['durationSec'] ?? 30)),
                     'target_region'         => sanitize_text_field($params['targetRegion'] ?? 'nasional'),
@@ -641,14 +951,16 @@ add_action('rest_api_init', function () {
                     'total_hits_delivered'  => 0,
                     'allocated_points'      => $allocated,
                     'status'                => sanitize_text_field($params['status'] ?? 'active'),
-                    'audit_status'          => sanitize_text_field($params['auditStatus'] ?? 'approved'),
-                    'audit_score'           => intval($params['auditScore'] ?? 0),
-                    'audit_violations'      => wp_json_encode($params['auditViolations'] ?? []),
-                    'detected_keywords'     => wp_json_encode($params['detectedKeywords'] ?? []),
-                    'audit_notes'           => sanitize_textarea_field($params['auditNotes'] ?? ''),
+                    'audit_status'          => 'approved',
+                    'audit_score'           => (int) ($probe['compliance']['riskScore'] ?? 0),
+                    'audit_violations'      => wp_json_encode($probe['compliance']['violations'] ?? []),
+                    'detected_keywords'     => wp_json_encode($probe['compliance']['detectedKeywords'] ?? []),
+                    'audit_notes'           => sanitize_textarea_field($probe['compliance']['reason'] . ' ' . $probe['frameReason']),
                     'reported_count'        => 0,
                     'submitted_by_user_id'  => $uid,
-                    'preview_content'       => isset($params['previewContent']) ? wp_json_encode($params['previewContent']) : null,
+                    'iframe_allowed'        => $iframe_allowed ? 1 : 0,
+                    'referrer_policy'       => $referrer_policy,
+                    'preview_content'       => $preview_content ? wp_json_encode($preview_content) : null,
                     'created_at'            => current_time('Y-m-d'),
                 ]);
 
@@ -662,6 +974,7 @@ add_action('rest_api_init', function () {
                 return rest_ensure_response([
                     'website' => trafik_bridge_format_campaign($row),
                     'user'    => trafik_bridge_format_user(get_user_by('id', $uid)),
+                    'probe'   => $probe,
                 ]);
             },
         ],

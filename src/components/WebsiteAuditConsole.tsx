@@ -16,10 +16,13 @@ import {
   ArrowUpRight,
   Eye,
   FileText,
-  Scan
+  Scan,
+  Loader2,
+  Globe
 } from 'lucide-react';
-import { WebsiteCampaign, WebsiteAuditStatus } from '../types';
+import { WebsiteCampaign, WebsiteAuditStatus, WebsiteProbeResult } from '../types';
 import { auditWebsiteCompliance } from '../services/complianceAuditEngine';
+import { wpAuthService } from '../services/wordpressAuthService';
 
 interface WebsiteAuditConsoleProps {
   websites: WebsiteCampaign[];
@@ -41,6 +44,8 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
   const [testUrl, setTestUrl] = useState<string>('https://slot-gacor-zeus-maxwin.xyz');
   const [testTitle, setTestTitle] = useState<string>('Daftar Akun Slot Gacor Terpercaya Deposit Pulsa Tanpa Potongan');
   const [testResult, setTestResult] = useState<ReturnType<typeof auditWebsiteCompliance> | null>(null);
+  const [probeMeta, setProbeMeta] = useState<WebsiteProbeResult | null>(null);
+  const [isScanning, setIsScanning] = useState<boolean>(false);
 
   // Selected website for audit detail modal
   const [selectedSiteDetail, setSelectedSiteDetail] = useState<WebsiteCampaign | null>(null);
@@ -64,11 +69,23 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
     return matchesSearch && matchesFilter;
   });
 
-  const handleRunTestScan = (e: React.FormEvent) => {
+  const handleRunTestScan = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!testUrl.trim()) return;
-    const result = auditWebsiteCompliance(testUrl, testTitle);
-    setTestResult(result);
+    setProbeMeta(null);
+
+    const localResult = auditWebsiteCompliance(testUrl, testTitle);
+    setTestResult(localResult);
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      setIsScanning(true);
+      const probe = await wpAuthService.probeWebsite(testUrl, testTitle);
+      setIsScanning(false);
+      if (probe) {
+        setProbeMeta(probe);
+        setTestResult(probe.compliance);
+      }
+    }
   };
 
   return (
@@ -216,10 +233,11 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
 
             <button
               type="submit"
-              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
+              disabled={isScanning}
+              className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-semibold text-xs transition-colors cursor-pointer flex items-center gap-1.5 shadow-sm"
             >
-              <Scan className="w-3.5 h-3.5" />
-              <span>Jalankan Pemindaian AI & Kata Kunci</span>
+              {isScanning ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Scan className="w-3.5 h-3.5" />}
+              <span>{isScanning ? 'Memindai HTML & Header Live...' : 'Jalankan Pemindaian HTML & Kata Kunci'}</span>
             </button>
           </div>
         </form>
@@ -267,6 +285,29 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
             <p className="text-xs text-slate-300 mt-2.5 leading-relaxed">
               {testResult.reason}
             </p>
+
+            {probeMeta && (
+              <div className="mt-3 pt-3 border-t border-slate-800/70 grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
+                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-slate-500 block">Respon Server Live</span>
+                  <span className="text-slate-200 font-mono">
+                    {probeMeta.reachable ? `HTTP ${probeMeta.httpStatus} (Online)` : 'Tidak terjangkau / Offline'}
+                  </span>
+                </div>
+                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-slate-500 block">Kompatibilitas Selancar</span>
+                  <span className={probeMeta.iframeAllowed ? 'text-emerald-300 font-semibold' : 'text-amber-300 font-semibold'}>
+                    {probeMeta.iframeAllowed ? 'Live Iframe Didukung' : 'Mode Tab Terkontrol (X-Frame Block)'}
+                  </span>
+                </div>
+                <div className="p-2 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                  <span className="text-slate-500 block">Title HTML Terdeteksi</span>
+                  <span className="text-slate-300 truncate block">
+                    {probeMeta.fetchedTitle || '—'}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {testResult.detectedKeywords.length > 0 && (
               <div className="mt-3 pt-2 flex flex-wrap items-center gap-1.5 text-xs">

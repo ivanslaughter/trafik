@@ -16,11 +16,13 @@ import {
   ArrowUpRight,
   ShieldCheck,
   ShieldAlert,
-  Ban
+  Ban,
+  Loader2
 } from 'lucide-react';
 import { WebsiteCampaign, IndonesianRegionId, DeviceType, WebsiteCategory, UserProfile } from '../types';
 import { INDONESIAN_REGIONS } from '../data/mockData';
 import { auditWebsiteCompliance } from '../services/complianceAuditEngine';
+import { wpAuthService } from '../services/wordpressAuthService';
 import { APP_CONFIG, APP_NAME } from '../config/appConfig';
 
 interface WebsitesManagerProps {
@@ -57,6 +59,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   const [targetDevice, setTargetDevice] = useState<DeviceType>('all');
   const [dailyLimit, setDailyLimit] = useState<number>(100);
   const [allocatedPoints, setAllocatedPoints] = useState<number>(200);
+  const [referrerPolicy, setReferrerPolicy] = useState<'direct' | 'referral'>('direct');
+  const [isProbing, setIsProbing] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [detectedViolationKeywords, setDetectedViolationKeywords] = useState<string[]>([]);
   const [successMsg, setSuccessMsg] = useState<string>('');
@@ -76,7 +80,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
     }
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setDetectedViolationKeywords([]);
@@ -91,8 +95,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       return;
     }
 
-    // Comprehensive Heuristic Compliance Audit (Anti-Judi Online & Anti-18+)
-    const auditResult = auditWebsiteCompliance(url, title);
+    // 1. Instant client-side Heuristic Compliance Audit (Anti-Judi Online & Anti-18+)
+    let auditResult = auditWebsiteCompliance(url, title);
     if (!auditResult.passed) {
       setErrorMsg(auditResult.reason);
       setDetectedViolationKeywords(auditResult.detectedKeywords);
@@ -102,6 +106,31 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
     if (allocatedPoints > user.points) {
       setErrorMsg(`Saldo poin Anda tidak cukup (${user.points} Poin tersedia). Beli poin atau kurangi alokasi awal.`);
       return;
+    }
+
+    // 2. Live WordPress Server Probe (wp_remote_get HTML scan + X-Frame-Options header check)
+    let iframeAllowed = true;
+    let auditNotes = auditResult.reason;
+    let fetchedTitle = '';
+    let fetchedDescription = '';
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      setIsProbing(true);
+      const probe = await wpAuthService.probeWebsite(url, title);
+      setIsProbing(false);
+
+      if (probe) {
+        if (!probe.compliance.passed) {
+          setErrorMsg(probe.compliance.reason);
+          setDetectedViolationKeywords(probe.compliance.detectedKeywords || []);
+          return;
+        }
+        auditResult = probe.compliance;
+        iframeAllowed = probe.iframeAllowed;
+        auditNotes = `${probe.compliance.reason} ${probe.frameReason}`.trim();
+        fetchedTitle = probe.fetchedTitle || '';
+        fetchedDescription = probe.fetchedDescription || '';
+      }
     }
 
     const cost = calculateCostPerHit(durationSec);
@@ -117,13 +146,17 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       dailyHitLimit: dailyLimit,
       allocatedPoints,
       status: 'active',
+      iframeAllowed,
+      referrerPolicy,
       auditStatus: 'approved',
       auditScore: auditResult.riskScore,
       reportedCount: 0,
-      auditNotes: auditResult.reason,
+      auditNotes,
       previewContent: {
-        headline: title,
-        description: `Website terdaftar di ${APP_CONFIG.fullName} kategori ${category.toUpperCase()} dengan target wilayah ${targetRegion.toUpperCase()}.`,
+        headline: fetchedTitle || title,
+        description:
+          fetchedDescription ||
+          `Website terdaftar di ${APP_CONFIG.fullName} kategori ${category.toUpperCase()} dengan target wilayah ${targetRegion.toUpperCase()}.`,
         author: user.name,
         city: targetRegion === 'nasional' ? 'Seluruh Nusantara' : targetRegion,
         tags: [category, `${APP_NAME} Indonesia`, 'Web Nusantara'],
@@ -131,13 +164,17 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       },
     });
 
-    setSuccessMsg('Website berhasil lolos audit kepatuhan dan ditambahkan ke antrean penukaran trafik!');
+    setSuccessMsg(
+      iframeAllowed
+        ? 'Website lolos audit HTML & mendukung Live Iframe (kunjungan langsung tercatat Google Analytics)!'
+        : 'Website lolos audit! Header X-Frame-Options terdeteksi — otomatis dialihkan ke Mode Tab Terkontrol (Hybrid) agar Google Analytics tetap mencatat kunjungan.'
+    );
     setTimeout(() => {
       setIsModalOpen(false);
       setSuccessMsg('');
       setTitle('');
       setUrl('https://');
-    }, 1200);
+    }, 1500);
   };
 
   const handleTopupPoints = (e: React.FormEvent) => {
@@ -275,7 +312,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                         </span>
                       ) : (
                         <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-slate-900 text-slate-400 border border-slate-800">
-                          Rotasi Aktif
+                          {site.iframeAllowed === false ? 'Mode Tab Terkontrol' : 'Live Iframe (GA4)'}
                         </span>
                       )}
                     </div>
@@ -559,20 +596,41 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                 </span>
               </div>
 
+              {/* Google Analytics Referrer Policy */}
+              <div>
+                <label className="block text-xs font-medium text-slate-300 mb-1">
+                  Pelacakan Sumber di Google Analytics (GA4)
+                </label>
+                <select
+                  value={referrerPolicy}
+                  onChange={(e) => setReferrerPolicy(e.target.value as 'direct' | 'referral')}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 focus:outline-none focus:border-emerald-500 cursor-pointer"
+                >
+                  <option value="direct">Direct (Anonim — sembunyikan asal domain pertukaran)</option>
+                  <option value="referral">Referral (Tercatat datang dari trafik.velocity.web.id)</option>
+                </select>
+                <span className="text-[11px] text-slate-500 mt-1 block">
+                  Kunjungan membuka URL Anda secara langsung (Live Iframe / Tab Terkontrol) sehingga GA4 &amp; pixel analitik tetap mencatat sesi aktif.
+                </span>
+              </div>
+
               {/* Actions */}
               <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
+                  disabled={isProbing}
                   className="px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm"
+                  disabled={isProbing}
+                  className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm inline-flex items-center gap-1.5"
                 >
-                  Simpan & Luncurkan
+                  {isProbing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  <span>{isProbing ? 'Memindai HTML & Header Situs...' : 'Simpan & Luncurkan'}</span>
                 </button>
               </div>
             </form>

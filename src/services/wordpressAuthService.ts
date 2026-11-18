@@ -1,4 +1,4 @@
-import { UserProfile, WebsiteCampaign, AntiCheatLogEntry } from '../types';
+import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, WebsiteProbeResult } from '../types';
 
 export type WordPressAuthMode = 'bridge' | 'simulated';
 
@@ -348,15 +348,30 @@ class WordPressAuthService {
     return res.ok && res.data ? res.data : null;
   }
 
+  public async probeWebsite(
+    url: string,
+    title = ''
+  ): Promise<WebsiteProbeResult | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<WebsiteProbeResult>('/websites/probe', {
+      method: 'POST',
+      body: JSON.stringify({ url, title }),
+    });
+    return res.ok && res.data ? res.data : null;
+  }
+
   public async createWebsite(
     siteData: Omit<WebsiteCampaign, 'id' | 'createdAt' | 'hitsDeliveredToday' | 'totalHitsDelivered'>
-  ): Promise<{ website: WebsiteCampaign; user: UserProfile } | null> {
+  ): Promise<{ website?: WebsiteCampaign; user?: UserProfile; error?: string } | null> {
     if (!this.isLiveBridgeActive()) return null;
     const res = await this.request<{ website: WebsiteCampaign; user: UserProfile }>('/websites', {
       method: 'POST',
       body: JSON.stringify(siteData),
     });
-    return res.ok && res.data ? res.data : null;
+    if (!res.ok) {
+      return { error: res.error || 'Gagal menyimpan website di server WordPress.' };
+    }
+    return res.data ? res.data : null;
   }
 
   public async updateWebsiteAction(

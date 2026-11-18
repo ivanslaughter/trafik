@@ -391,6 +391,9 @@ export default function App() {
   };
 
   const handleDeductSitePoints = (siteId: string, cost: number) => {
+    const targetSite = communityWebsites.find((s) => s.id === siteId);
+    const actualDuration = targetSite?.durationSec || 30;
+
     setCommunityWebsites((prev) =>
       prev.map((site) => {
         if (site.id === siteId) {
@@ -413,7 +416,7 @@ export default function App() {
           siteId,
           earnedPoints: lastEarnedPointsRef.current,
           cost,
-          durationSec: 30,
+          durationSec: actualDuration,
         })
         .then((res) => {
           if (res?.user) setUser(res.user);
@@ -458,10 +461,18 @@ export default function App() {
 
     if (wpAuthService.isLiveBridgeActive()) {
       wpAuthService.createWebsite(newSiteData).then((res) => {
-        if (res) {
+        if (res?.website && res?.user) {
+          const createdSite = res.website;
           setUser(res.user);
-          setUserWebsites((prev) => prev.map((s) => (s.id === tempId ? res.website : s)));
-          setCommunityWebsites((prev) => prev.map((s) => (s.id === tempId ? res.website : s)));
+          setUserWebsites((prev) => prev.map((s) => (s.id === tempId ? createdSite : s)));
+          setCommunityWebsites((prev) => prev.map((s) => (s.id === tempId ? createdSite : s)));
+        } else if (res?.error) {
+          setUser((prev) => ({
+            ...prev,
+            points: prev.points + newSiteData.allocatedPoints,
+          }));
+          setUserWebsites((prev) => prev.filter((s) => s.id !== tempId));
+          setCommunityWebsites((prev) => prev.filter((s) => s.id !== tempId));
         }
       });
     }

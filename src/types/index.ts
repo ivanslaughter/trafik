@@ -32,6 +32,16 @@ export interface AuditEvaluation {
   auditTimestamp: string;
 }
 
+export interface WebsiteProbeResult {
+  reachable: boolean;
+  httpStatus: number;
+  iframeAllowed: boolean;
+  frameReason: string;
+  fetchedTitle?: string;
+  fetchedDescription?: string;
+  compliance: AuditEvaluation;
+}
+
 export interface WebsiteCampaign {
   id: string;
   title: string;
@@ -47,6 +57,9 @@ export interface WebsiteCampaign {
   allocatedPoints: number;
   status: 'active' | 'paused' | 'depleted';
   createdAt: string;
+  // Hybrid Surf & Analytics Fields
+  iframeAllowed?: boolean; // true = loads in live iframe; false = requires controlled surf tab fallback
+  referrerPolicy?: 'direct' | 'referral'; // 'direct' sets no-referrer; 'referral' passes trafik.velocity.web.id
   // Compliance & Anti-Judi/18+ Audit Fields
   auditStatus: WebsiteAuditStatus;
   auditScore: number; // 0 = 100% safe, 100 = critical violation
@@ -55,7 +68,7 @@ export interface WebsiteCampaign {
   auditNotes?: string;
   reportedCount: number;
   submittedByUserId?: string;
-  // Simulated rich preview content for in-app sandboxed surfing
+  // Fallback metadata summary when previewing offline/sample sites
   previewContent?: {
     headline: string;
     description: string;

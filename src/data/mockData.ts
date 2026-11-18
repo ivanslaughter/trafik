@@ -254,6 +254,7 @@ export const INITIAL_COMMUNITY_WEBSITES: WebsiteCampaign[] = [
     totalHitsDelivered: 1940,
     allocatedPoints: 500,
     status: 'active',
+    iframeAllowed: false,
     auditStatus: 'approved',
     auditScore: 0,
     reportedCount: 0,
