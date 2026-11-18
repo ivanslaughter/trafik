@@ -11,7 +11,8 @@ import {
   Clock,
   Layers,
   Flame,
-  Award
+  Award,
+  BookOpen
 } from 'lucide-react';
 import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, IndonesianRegionId } from '../types';
 import { IndonesiaNetworkMap } from './IndonesiaNetworkMap';
@@ -26,6 +27,7 @@ interface DashboardViewProps {
   onOpenWebsites: () => void;
   onOpenAntiCheat: () => void;
   onOpenPricing: () => void;
+  onOpenHelp?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -36,6 +38,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenWebsites,
   onOpenAntiCheat,
   onOpenPricing,
+  onOpenHelp,
 }) => {
   const [mapRegion, setMapRegion] = useState<IndonesianRegionId>('nasional');
   const activeWebsitesCount = websites.filter((w) => w.status === 'active').length;
@@ -82,6 +85,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             >
               Kelola Website ({websites.length})
             </button>
+
+            {onOpenHelp && (
+              <button
+                onClick={onOpenHelp}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg border border-slate-700/80 bg-slate-900/60 hover:bg-slate-800 text-slate-300 text-xs font-medium transition-colors cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Panduan Member</span>
+              </button>
+            )}
           </div>
         </div>
 

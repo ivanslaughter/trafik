@@ -1,26 +1,32 @@
-import { UserProfile } from '../types';
+import { UserProfile, WebsiteCampaign, AntiCheatLogEntry } from '../types';
 
-export interface WordPressAuthResponse {
-  token?: string;
-  user_email?: string;
-  user_nicename?: string;
-  user_display_name?: string;
-  roles?: string[];
-  id?: number;
-}
+export type WordPressAuthMode = 'bridge' | 'simulated';
 
 export interface WordPressConnectionConfig {
   wpUrl: string; // e.g. https://velocity.web.id
-  authMode: 'jwt' | 'app_password' | 'cookie' | 'simulated';
-  jwtEndpoint: string; // e.g. /wp-json/jwt-auth/v1/token
+  authMode: WordPressAuthMode;
   userMetaKey: string; // e.g. tn_traffic_points
   autoSyncPoints: boolean;
+}
+
+export interface BridgeHealthResponse {
+  reachable: boolean;
+  pluginInstalled: boolean;
+  dbReady?: boolean;
+  siteName?: string;
+  wpVersion?: string;
+  version?: string;
+  counts?: {
+    campaigns: number;
+    logs: number;
+    users: number;
+  };
+  message: string;
 }
 
 const DEFAULT_CONFIG: WordPressConnectionConfig = {
   wpUrl: 'https://velocity.web.id',
   authMode: 'simulated',
-  jwtEndpoint: '/wp-json/jwt-auth/v1/token',
   userMetaKey: 'tn_traffic_points',
   autoSyncPoints: true,
 };
@@ -34,9 +40,18 @@ class WordPressAuthService {
       const savedConfig = localStorage.getItem('tn_wp_config');
       if (savedConfig) {
         try {
-          this.config = { ...DEFAULT_CONFIG, ...JSON.parse(savedConfig) };
+          const parsed = JSON.parse(savedConfig);
+          const normalizedMode: WordPressAuthMode =
+            parsed.authMode === 'bridge' || parsed.authMode === 'jwt' || parsed.authMode === 'app_password'
+              ? 'bridge'
+              : 'simulated';
+          this.config = {
+            ...DEFAULT_CONFIG,
+            ...parsed,
+            authMode: normalizedMode,
+          };
         } catch {
-          // ignore
+          // ignore invalid saved config
         }
       }
       this.token = localStorage.getItem('tn_wp_jwt_token');
@@ -54,127 +69,357 @@ class WordPressAuthService {
     }
   }
 
-  /**
-   * Attempts authentication against the WordPress REST API endpoint
-   * @param username WordPress username or email
-   * @param password WordPress password or Application Password
-   */
-  public async loginWithWordPress(
-    username: string,
-    password: string
-  ): Promise<{ success: boolean; user?: Partial<UserProfile>; message: string }> {
-    // If in simulated mode or testing mode without live CORS setup:
-    if (this.config.authMode === 'simulated') {
-      await new Promise((r) => setTimeout(r, 800)); // simulate network latency
+  public getToken(): string | null {
+    return this.token;
+  }
 
-      const isAdmin =
-        username.toLowerCase().includes('admin') ||
-        username.toLowerCase() === 'admin@velocity.web.id';
+  public isLiveBridgeActive(): boolean {
+    return this.config.authMode === 'bridge' && Boolean(this.token);
+  }
 
-      const mockWpUser: Partial<UserProfile> = {
-        name: isAdmin ? 'Admin Velocity WordPress' : username.split('@')[0],
-        email: username.includes('@') ? username : `${username}@velocity.web.id`,
-        role: isAdmin ? 'admin' : 'user',
-        membership: isAdmin ? 'pro_nusantara' : 'gratis',
-        surfRatio: isAdmin ? 1.0 : 0.7,
-        lastActive: 'Terhubung via WordPress REST API',
-      };
+  private getApiBase(): string {
+    return `${this.config.wpUrl.replace(/\/$/, '')}/wp-json/trafik/v1`;
+  }
 
-      return {
-        success: true,
-        user: mockWpUser,
-        message: `Berhasil login menggunakan akun WordPress ${this.config.wpUrl}!`,
-      };
+  private async request<T>(
+    path: string,
+    options: RequestInit = {},
+    requireAuth = true
+  ): Promise<{ ok: boolean; status: number; data?: T; error?: string }> {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(options.headers as Record<string, string>),
+    };
+
+    if (requireAuth && this.token) {
+      headers['X-Trafik-Token'] = this.token;
     }
 
-    // Live HTTP Request to WordPress REST API
     try {
-      const endpoint = `${this.config.wpUrl.replace(/\/$/, '')}${this.config.jwtEndpoint}`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'application/json',
-        },
-        body: JSON.stringify({
-          username,
-          password,
-        }),
+      const res = await fetch(`${this.getApiBase()}${path}`, {
+        ...options,
+        headers,
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
         return {
-          success: false,
-          message:
-            errorData.message ||
-            `Gagal login ke WordPress: Status ${response.status}. Periksa username/password atau plugin JWT di WordPress.`,
+          ok: false,
+          status: res.status,
+          error: json.message || `Error HTTP ${res.status}`,
         };
       }
-
-      const data: WordPressAuthResponse = await response.json();
-      if (data.token) {
-        this.token = data.token;
-        if (typeof localStorage !== 'undefined') {
-          localStorage.setItem('tn_wp_jwt_token', data.token);
-        }
-      }
-
-      const isAdmin = (data.roles || []).includes('administrator');
-
-      const wpProfile: Partial<UserProfile> = {
-        name: data.user_display_name || data.user_nicename || username,
-        email: data.user_email || username,
-        role: isAdmin ? 'admin' : 'user',
-        membership: isAdmin ? 'pro_nusantara' : 'gratis',
-        surfRatio: isAdmin ? 1.0 : 0.7,
-        lastActive: 'Sinkronisasi WordPress Aktif',
-      };
-
-      return {
-        success: true,
-        user: wpProfile,
-        message: 'Koneksi ke WordPress berhasil! Sesi autentikasi telah disinkronkan.',
-      };
+      return { ok: true, status: res.status, data: json as T };
     } catch (err: any) {
       return {
-        success: false,
-        message: `Gagal menghubungi WordPress (${err.message || 'CORS / Network Error'}). Pastikan plugin JWT / Application Passwords aktif dan CORS diizinkan di WordPress.`,
+        ok: false,
+        status: 0,
+        error: err?.message || 'Tidak dapat menjangkau server WordPress (CORS / Network Error).',
       };
     }
   }
 
   /**
-   * Tests connection to WordPress site REST API root (/wp-json/)
+   * Login via WordPress Plugin Bridge (/wp-json/trafik/v1/auth/login)
    */
-  public async testWordPressConnection(): Promise<{
-    reachable: boolean;
-    siteName?: string;
-    description?: string;
-    message: string;
-  }> {
-    try {
-      const endpoint = `${this.config.wpUrl.replace(/\/$/, '')}/wp-json/`;
-      const response = await fetch(endpoint, { method: 'GET' });
-      if (!response.ok) {
-        return {
-          reachable: false,
-          message: `Server WordPress merespons dengan status ${response.status}`,
-        };
-      }
-      const data = await response.json();
+  public async loginWithWordPress(
+    username: string,
+    password: string
+  ): Promise<{ success: boolean; user?: UserProfile; message: string }> {
+    if (this.config.authMode === 'simulated') {
+      await new Promise((r) => setTimeout(r, 500));
+
+      const isAdmin =
+        username.toLowerCase().includes('admin') ||
+        username.toLowerCase() === 'admin@velocity.web.id';
+
+      const mockWpUser: UserProfile = {
+        id: isAdmin ? 'usr_wp_admin' : 'usr_wp_' + Math.random().toString(36).substring(2, 7),
+        name: isAdmin ? 'Admin Velocity WordPress' : username.split('@')[0],
+        email: username.includes('@') ? username : `${username}@velocity.web.id`,
+        role: isAdmin ? 'admin' : 'user',
+        status: 'active',
+        city: 'Indonesia',
+        points: isAdmin ? 5000 : 1500,
+        membership: isAdmin ? 'pro_nusantara' : 'gratis',
+        surfRatio: isAdmin ? 1.0 : 0.7,
+        totalHitsGiven: 0,
+        totalHitsReceived: 0,
+        dailySurfedSeconds: 0,
+        dailyTargetSeconds: 1800,
+        streakDays: 1,
+        referralCode: 'WP-' + (username.split('@')[0] || 'USER').substring(0, 4).toUpperCase(),
+        referredCount: 0,
+        referralPointsEarned: 0,
+        websiteSlots: isAdmin ? 20 : 3,
+        joinedDate: new Date().toISOString().split('T')[0],
+        lastActive: 'Mode Simulasi WordPress',
+      };
+
+      return {
+        success: true,
+        user: mockWpUser,
+        message: `Berhasil login simulasi sebagai akun WordPress ${this.config.wpUrl}!`,
+      };
+    }
+
+    const res = await this.request<{ success: boolean; token: string; user: UserProfile }>(
+      '/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify({ username, password }),
+      },
+      false
+    );
+
+    if (!res.ok || !res.data?.token) {
+      return {
+        success: false,
+        message: res.error || 'Gagal login ke WordPress Plugin Bridge.',
+      };
+    }
+
+    this.token = res.data.token;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('tn_wp_jwt_token', res.data.token);
+    }
+
+    return {
+      success: true,
+      user: res.data.user,
+      message: 'Login WordPress berhasil! Data tersinkronisasi langsung dengan MySQL.',
+    };
+  }
+
+  /**
+   * Register new WordPress subscriber account via Bridge
+   */
+  public async registerWithWordPress(
+    name: string,
+    email: string,
+    password: string,
+    city = 'Indonesia'
+  ): Promise<{ success: boolean; user?: UserProfile; message: string }> {
+    if (this.config.authMode === 'simulated') {
+      return {
+        success: false,
+        message: 'Pendaftaran akun WordPress nyata hanya tersedia pada mode Live WordPress Plugin Bridge.',
+      };
+    }
+
+    const res = await this.request<{ success: boolean; token: string; user: UserProfile }>(
+      '/auth/register',
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, email, password, city }),
+      },
+      false
+    );
+
+    if (!res.ok || !res.data?.token) {
+      return {
+        success: false,
+        message: res.error || 'Gagal mendaftar akun ke WordPress.',
+      };
+    }
+
+    this.token = res.data.token;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('tn_wp_jwt_token', res.data.token);
+    }
+
+    return {
+      success: true,
+      user: res.data.user,
+      message: 'Akun WordPress baru berhasil dibuat & tersinkronisasi dengan MySQL!',
+    };
+  }
+
+  /**
+   * Tests Plugin Bridge health (/wp-json/trafik/v1/health) with fallback to /wp-json/
+   */
+  public async testWordPressConnection(): Promise<BridgeHealthResponse> {
+    const healthRes = await this.request<{
+      ok: boolean;
+      plugin: string;
+      version: string;
+      siteName: string;
+      wpVersion: string;
+      dbReady: boolean;
+      counts?: { campaigns: number; logs: number; users: number };
+    }>('/health', { method: 'GET' }, false);
+
+    if (healthRes.ok && healthRes.data) {
       return {
         reachable: true,
-        siteName: data.name || 'WordPress Site',
-        description: data.description || '',
-        message: 'Endpoint WP REST API aktif dan dapat diakses!',
+        pluginInstalled: true,
+        dbReady: healthRes.data.dbReady,
+        siteName: healthRes.data.siteName,
+        wpVersion: healthRes.data.wpVersion,
+        version: healthRes.data.version,
+        counts: healthRes.data.counts,
+        message: healthRes.data.dbReady
+          ? `Trafik WP Bridge v${healthRes.data.version} aktif! MySQL siap (${healthRes.data.counts?.users ?? 0} user, ${healthRes.data.counts?.campaigns ?? 0} kampanye).`
+          : 'Plugin terdeteksi, namun tabel MySQL belum lengkap. Coba nonaktifkan & aktifkan ulang plugin di WP Admin.',
+      };
+    }
+
+    // Fallback check to see if WordPress REST API root exists
+    try {
+      const rootEndpoint = `${this.config.wpUrl.replace(/\/$/, '')}/wp-json/`;
+      const rootRes = await fetch(rootEndpoint, { method: 'GET' });
+      if (rootRes.ok) {
+        const rootJson = await rootRes.json().catch(() => ({}));
+        return {
+          reachable: true,
+          pluginInstalled: false,
+          siteName: rootJson.name || 'WordPress',
+          message: `WordPress "${rootJson.name || this.config.wpUrl}" aktif, tetapi plugin Trafik WP Bridge belum terpasang/diaktifkan.`,
+        };
+      }
+      return {
+        reachable: false,
+        pluginInstalled: false,
+        message: `WordPress merespons status HTTP ${rootRes.status}.`,
       };
     } catch (err: any) {
       return {
         reachable: false,
-        message: `Tidak dapat menjangkau ${this.config.wpUrl}/wp-json/. Pesan: ${err.message || 'CORS / Offline'}.`,
+        pluginInstalled: false,
+        message: `Tidak dapat menjangkau ${this.config.wpUrl}. Pastikan domain online & CORS diizinkan (${err?.message || 'Network Error'}).`,
       };
     }
+  }
+
+  public async fetchMe(): Promise<UserProfile | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ user: UserProfile }>('/me', { method: 'GET' });
+    return res.ok && res.data ? res.data.user : null;
+  }
+
+  public async updateMe(payload: {
+    name?: string;
+    city?: string;
+    addPoints?: number;
+    upgradeVip?: boolean;
+  }): Promise<UserProfile | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ user: UserProfile }>('/me', {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    });
+    return res.ok && res.data ? res.data.user : null;
+  }
+
+  public async completeSurf(payload: {
+    siteId: string;
+    earnedPoints: number;
+    cost: number;
+    durationSec?: number;
+  }): Promise<{ user?: UserProfile; campaign?: WebsiteCampaign | null } | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{
+      success: boolean;
+      user: UserProfile;
+      campaign: WebsiteCampaign | null;
+    }>('/surf/complete', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+    return res.ok && res.data ? { user: res.data.user, campaign: res.data.campaign } : null;
+  }
+
+  public async fetchWebsites(): Promise<{
+    myWebsites: WebsiteCampaign[];
+    communityWebsites: WebsiteCampaign[];
+  } | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{
+      myWebsites: WebsiteCampaign[];
+      communityWebsites: WebsiteCampaign[];
+    }>('/websites', { method: 'GET' });
+    return res.ok && res.data ? res.data : null;
+  }
+
+  public async createWebsite(
+    siteData: Omit<WebsiteCampaign, 'id' | 'createdAt' | 'hitsDeliveredToday' | 'totalHitsDelivered'>
+  ): Promise<{ website: WebsiteCampaign; user: UserProfile } | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ website: WebsiteCampaign; user: UserProfile }>('/websites', {
+      method: 'POST',
+      body: JSON.stringify(siteData),
+    });
+    return res.ok && res.data ? res.data : null;
+  }
+
+  public async updateWebsiteAction(
+    siteId: string,
+    payload: {
+      action: 'toggle_status' | 'add_points' | 'report' | 'approve' | 'reject' | 'quarantine';
+      amount?: number;
+      reason?: string;
+    }
+  ): Promise<{ website: WebsiteCampaign; user: UserProfile } | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ website: WebsiteCampaign; user: UserProfile }>(
+      `/websites/${encodeURIComponent(siteId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }
+    );
+    return res.ok && res.data ? res.data : null;
+  }
+
+  public async deleteWebsite(siteId: string): Promise<{ deleted: boolean; user: UserProfile } | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ deleted: boolean; user: UserProfile }>(
+      `/websites/${encodeURIComponent(siteId)}`,
+      { method: 'DELETE' }
+    );
+    return res.ok && res.data ? res.data : null;
+  }
+
+  public async fetchLogs(): Promise<AntiCheatLogEntry[] | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ logs: AntiCheatLogEntry[] }>('/logs', { method: 'GET' });
+    return res.ok && res.data ? res.data.logs : null;
+  }
+
+  public async pushLog(entry: AntiCheatLogEntry): Promise<void> {
+    if (!this.isLiveBridgeActive()) return;
+    await this.request('/logs', {
+      method: 'POST',
+      body: JSON.stringify(entry),
+    });
+  }
+
+  public async fetchAdminUsers(): Promise<UserProfile[] | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ users: UserProfile[] }>('/admin/users', { method: 'GET' });
+    return res.ok && res.data ? res.data.users : null;
+  }
+
+  public async createAdminUser(user: Partial<UserProfile> & { password?: string }): Promise<UserProfile | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ user: UserProfile }>('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(user),
+    });
+    return res.ok && res.data ? res.data.user : null;
+  }
+
+  public async updateAdminUser(userId: string, updated: Partial<UserProfile>): Promise<UserProfile | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ user: UserProfile }>(
+      `/admin/users/${encodeURIComponent(userId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify(updated),
+      }
+    );
+    return res.ok && res.data ? res.data.user : null;
   }
 
   public logout() {

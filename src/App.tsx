@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
 import { AutosurfViewer } from './components/AutosurfViewer';
@@ -24,16 +24,29 @@ import {
 } from './data/mockData';
 import { UserProfile, WebsiteCampaign, AntiCheatLogEntry } from './types';
 import { antiCheatEngine } from './services/antiCheatEngine';
+import { wpAuthService } from './services/wordpressAuthService';
 import { ShieldCheck, Heart, ExternalLink, HelpCircle, Ban, AlertTriangle } from 'lucide-react';
 import { APP_NAME, APP_CONFIG, getPageTitle } from './config/appConfig';
 import { AntiCheatToastContainer, AntiCheatToastItem } from './components/AntiCheatToast';
+import { LandingPage } from './components/LandingPage';
+import { HelpGuideView } from './components/HelpGuideView';
 
 export default function App() {
+  // Public Landing Page vs Workspace State
+  const [showLanding, setShowLanding] = useState<boolean>(() => {
+    if (wpAuthService.isLiveBridgeActive()) return false;
+    return sessionStorage.getItem('tn_entered_workspace') !== 'true';
+  });
+
   // Navigation State
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
 
-  // Dynamic Document Title based on current tab & APP_NAME
+  // Dynamic Document Title based on current view & APP_NAME
   useEffect(() => {
+    if (showLanding) {
+      document.title = getPageTitle();
+      return;
+    }
     const tabLabels: Record<string, string> = {
       dashboard: 'Dashboard',
       autosurf: 'Selancar Otomatis',
@@ -42,10 +55,11 @@ export default function App() {
       referral: 'Afiliasi & Referral',
       users: 'Manajemen Pengguna',
       audit: 'Audit Kepatuhan',
+      help: 'Panduan & Bantuan',
     };
     const currentLabel = tabLabels[currentTab];
     document.title = getPageTitle(currentLabel);
-  }, [currentTab]);
+  }, [currentTab, showLanding]);
 
   // All Users Database
   const [allUsers, setAllUsers] = useState<UserProfile[]>(() => {
@@ -88,16 +102,86 @@ export default function App() {
     localStorage.setItem('tn_user_profile', JSON.stringify(user));
   }, [user]);
 
-  // Keep current user updated in allUsers array
+  const lastEarnedPointsRef = useRef<number>(0);
+
+  // Sync all data from WordPress MySQL via Plugin Bridge
+  const syncFromWordPressBridge = useCallback(async () => {
+    if (!wpAuthService.isLiveBridgeActive()) return;
+
+    const me = await wpAuthService.fetchMe();
+    if (!me) {
+      wpAuthService.logout();
+      return;
+    }
+
+    setUser(me);
+    const [websitesData, logsData] = await Promise.all([
+      wpAuthService.fetchWebsites(),
+      wpAuthService.fetchLogs(),
+    ]);
+
+    if (websitesData) {
+      setUserWebsites(websitesData.myWebsites);
+      if (websitesData.communityWebsites.length > 0) {
+        setCommunityWebsites(websitesData.communityWebsites);
+      }
+    }
+    if (logsData && logsData.length > 0) {
+      setAuditLogs(logsData);
+    }
+    if (me.role === 'admin') {
+      const adminUsers = await wpAuthService.fetchAdminUsers();
+      if (adminUsers && adminUsers.length > 0) {
+        setAllUsers(adminUsers);
+      }
+    } else {
+      setAllUsers((prev) => {
+        const exists = prev.some((u) => u.id === me.id || u.email === me.email);
+        return exists ? prev.map((u) => (u.email === me.email ? me : u)) : [me, ...prev];
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    syncFromWordPressBridge();
+  }, [syncFromWordPressBridge]);
+
+  // Keep current user updated in allUsers array + sync to WP MySQL if active
   const handleUpdateCurrentUserData = (updated: Partial<UserProfile>) => {
     const newUserData = { ...user, ...updated };
     setUser(newUserData);
     setAllUsers((prev) =>
       prev.map((u) => (u.id === newUserData.id ? newUserData : u))
     );
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateMe({ name: updated.name, city: updated.city }).then((fresh) => {
+        if (fresh) setUser(fresh);
+      });
+    }
   };
 
-  const handleWordPressLoginSuccess = (wpUserData: Partial<UserProfile>) => {
+  const handleEnterWorkspace = (targetTab = 'dashboard') => {
+    sessionStorage.setItem('tn_entered_workspace', 'true');
+    setCurrentTab(targetTab);
+    setShowLanding(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleReturnToLanding = () => {
+    sessionStorage.removeItem('tn_entered_workspace');
+    setShowLanding(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleWordPressLoginSuccess = (wpUserData: UserProfile) => {
+    if (wpAuthService.isLiveBridgeActive()) {
+      setUser(wpUserData);
+      syncFromWordPressBridge();
+      handleEnterWorkspace('dashboard');
+      return;
+    }
+
     const existing = allUsers.find((u) => u.email === wpUserData.email);
     if (existing) {
       const merged = { ...existing, ...wpUserData };
@@ -105,30 +189,22 @@ export default function App() {
       handleUpdateUserInList(merged);
     } else {
       const newWpUser: UserProfile = {
-        id: 'usr_wp_' + Math.random().toString(36).substring(2, 7),
-        name: wpUserData.name || 'Pengguna WordPress',
-        email: wpUserData.email || 'user@velocity.web.id',
-        role: wpUserData.role || 'user',
-        status: 'active',
-        city: 'Indonesia',
-        points: 1500,
-        membership: wpUserData.membership || 'gratis',
-        surfRatio: wpUserData.surfRatio || 0.7,
-        totalHitsGiven: 0,
-        totalHitsReceived: 0,
-        dailySurfedSeconds: 0,
-        dailyTargetSeconds: 1800,
-        streakDays: 1,
-        referralCode: 'WP-' + (wpUserData.name || 'USER').substring(0, 4).toUpperCase(),
-        referredCount: 0,
-        referralPointsEarned: 0,
-        websiteSlots: wpUserData.membership === 'pro_nusantara' ? 20 : 3,
-        joinedDate: new Date().toISOString().split('T')[0],
+        ...wpUserData,
+        id: wpUserData.id || 'usr_wp_' + Math.random().toString(36).substring(2, 7),
         lastActive: 'Terhubung ke WordPress velocity.web.id',
       };
       setUser(newWpUser);
       setAllUsers((prev) => [newWpUser, ...prev]);
     }
+    handleEnterWorkspace('dashboard');
+  };
+
+  const handleWordPressLogout = () => {
+    setUser(INITIAL_USER);
+    setAllUsers(INITIAL_ALL_USERS);
+    setUserWebsites(INITIAL_USER_WEBSITES);
+    setCommunityWebsites(INITIAL_COMMUNITY_WEBSITES);
+    handleReturnToLanding();
   };
 
   const handleUpdateUserInList = (updatedUser: UserProfile) => {
@@ -138,10 +214,25 @@ export default function App() {
     if (updatedUser.id === user.id) {
       setUser(updatedUser);
     }
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateAdminUser(updatedUser.id, updatedUser).then((fresh) => {
+        if (fresh) {
+          setAllUsers((prev) => prev.map((u) => (u.id === fresh.id ? fresh : u)));
+          if (fresh.id === user.id) setUser(fresh);
+        }
+      });
+    }
   };
 
   const handleAddUser = (newUser: UserProfile) => {
     setAllUsers((prev) => [newUser, ...prev]);
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.createAdminUser(newUser).then((created) => {
+        if (created) {
+          setAllUsers((prev) => [created, ...prev.filter((u) => u.id !== newUser.id)]);
+        }
+      });
+    }
   };
 
   const handleSwitchUser = (userId: string) => {
@@ -221,6 +312,10 @@ export default function App() {
     const unsubscribe = antiCheatEngine.subscribe((entry: AntiCheatLogEntry) => {
       setAuditLogs((prev) => [entry, ...prev.slice(0, 49)]); // Keep last 50 logs
 
+      if (wpAuthService.isLiveBridgeActive() && entry.type !== 'HEARTBEAT_VERIFIED') {
+        wpAuthService.pushLog(entry);
+      }
+
       // Real-time Anti-Cheat Toast Notification:
       // Trigger toast whenever suspicious activity (warning or critical severity) is detected
       if (entry.severity === 'warning' || entry.severity === 'critical') {
@@ -263,7 +358,8 @@ export default function App() {
   };
 
   // Handlers for Surfing & Points
-  const handleAwardPoints = (earnedPoints: number, siteTitle: string) => {
+  const handleAwardPoints = (earnedPoints: number, _siteTitle: string) => {
+    lastEarnedPointsRef.current = earnedPoints;
     setUser((prev) => ({
       ...prev,
       points: Number((prev.points + earnedPoints).toFixed(2)),
@@ -288,6 +384,28 @@ export default function App() {
         return site;
       })
     );
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService
+        .completeSurf({
+          siteId,
+          earnedPoints: lastEarnedPointsRef.current,
+          cost,
+          durationSec: 30,
+        })
+        .then((res) => {
+          if (res?.user) setUser(res.user);
+          if (res?.campaign) {
+            const updated = res.campaign;
+            setCommunityWebsites((prev) =>
+              prev.map((s) => (s.id === updated.id ? updated : s))
+            );
+            setUserWebsites((prev) =>
+              prev.map((s) => (s.id === updated.id ? updated : s))
+            );
+          }
+        });
+    }
   };
 
   const handleAddWebsite = (
@@ -296,9 +414,10 @@ export default function App() {
       'id' | 'createdAt' | 'hitsDeliveredToday' | 'totalHitsDelivered'
     >
   ) => {
+    const tempId = 'site_' + Math.random().toString(36).substring(2, 9);
     const newSite: WebsiteCampaign = {
       ...newSiteData,
-      id: 'site_' + Math.random().toString(36).substring(2, 9),
+      id: tempId,
       hitsDeliveredToday: 0,
       totalHitsDelivered: 0,
       createdAt: new Date().toISOString().split('T')[0],
@@ -314,6 +433,16 @@ export default function App() {
 
     // Also add to community surf pool so it can be seen
     setCommunityWebsites((prev) => [newSite, ...prev]);
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.createWebsite(newSiteData).then((res) => {
+        if (res) {
+          setUser(res.user);
+          setUserWebsites((prev) => prev.map((s) => (s.id === tempId ? res.website : s)));
+          setCommunityWebsites((prev) => prev.map((s) => (s.id === tempId ? res.website : s)));
+        }
+      });
+    }
   };
 
   const handleToggleWebsiteStatus = (siteId: string) => {
@@ -326,6 +455,15 @@ export default function App() {
         return s;
       })
     );
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateWebsiteAction(siteId, { action: 'toggle_status' }).then((res) => {
+        if (res?.website) {
+          setUserWebsites((prev) => prev.map((s) => (s.id === siteId ? res.website : s)));
+          setCommunityWebsites((prev) => prev.map((s) => (s.id === siteId ? res.website : s)));
+        }
+      });
+    }
   };
 
   const handleDeleteWebsite = (siteId: string) => {
@@ -342,6 +480,12 @@ export default function App() {
 
     setUserWebsites((prev) => prev.filter((s) => s.id !== siteId));
     setCommunityWebsites((prev) => prev.filter((s) => s.id !== siteId));
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.deleteWebsite(siteId).then((res) => {
+        if (res?.user) setUser(res.user);
+      });
+    }
   };
 
   const handleAddPointsToSite = (siteId: string, amount: number) => {
@@ -364,6 +508,16 @@ export default function App() {
         return s;
       })
     );
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateWebsiteAction(siteId, { action: 'add_points', amount }).then((res) => {
+        if (res) {
+          setUser(res.user);
+          setUserWebsites((prev) => prev.map((s) => (s.id === siteId ? res.website : s)));
+          setCommunityWebsites((prev) => prev.map((s) => (s.id === siteId ? res.website : s)));
+        }
+      });
+    }
   };
 
   const handleAddUserPoints = (amount: number) => {
@@ -371,6 +525,11 @@ export default function App() {
       ...prev,
       points: prev.points + amount,
     }));
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateMe({ addPoints: amount }).then((fresh) => {
+        if (fresh) setUser(fresh);
+      });
+    }
   };
 
   const handleUpgradeToVip = () => {
@@ -379,6 +538,11 @@ export default function App() {
       membership: 'pro_nusantara',
       surfRatio: 1.0, // 100% full ratio
     }));
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateMe({ upgradeVip: true }).then((fresh) => {
+        if (fresh) setUser(fresh);
+      });
+    }
   };
 
   const handleApproveWebsite = (siteId: string) => {
@@ -408,6 +572,10 @@ export default function App() {
           : s
       )
     );
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateWebsiteAction(siteId, { action: 'approve' });
+    }
   };
 
   const handleRejectWebsite = (siteId: string, reason: string) => {
@@ -437,6 +605,10 @@ export default function App() {
           : s
       )
     );
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateWebsiteAction(siteId, { action: 'reject', reason });
+    }
   };
 
   const handleQuarantineWebsite = (siteId: string, reason: string) => {
@@ -454,6 +626,10 @@ export default function App() {
           : s
       )
     );
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateWebsiteAction(siteId, { action: 'quarantine', reason });
+    }
   };
 
   const handleReportWebsite = (siteId: string, reason: string) => {
@@ -482,7 +658,34 @@ export default function App() {
       metricValue: 'Karantina Otomatis',
     };
     setAuditLogs((prev) => [logEntry, ...prev]);
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      wpAuthService.updateWebsiteAction(siteId, { action: 'report', reason });
+      wpAuthService.pushLog(logEntry);
+    }
   };
+
+  if (showLanding) {
+    return (
+      <LandingPage
+        currentUser={user}
+        isLiveConnected={wpAuthService.isLiveBridgeActive()}
+        onEnterWorkspace={handleEnterWorkspace}
+        onAuthenticatedUser={(authedUser) => {
+          setUser(authedUser);
+          setAllUsers((prev) => {
+            const exists = prev.some((u) => u.email === authedUser.email);
+            return exists
+              ? prev.map((u) => (u.email === authedUser.email ? authedUser : u))
+              : [authedUser, ...prev];
+          });
+          if (wpAuthService.isLiveBridgeActive()) {
+            syncFromWordPressBridge();
+          }
+        }}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -548,6 +751,7 @@ export default function App() {
             onOpenWebsites={() => setCurrentTab('websites')}
             onOpenAntiCheat={() => setCurrentTab('anticheat')}
             onOpenPricing={() => setPricingModalOpen(true)}
+            onOpenHelp={() => setCurrentTab('help')}
           />
         )}
 
@@ -603,6 +807,23 @@ export default function App() {
             onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
           />
         )}
+
+        {currentTab === 'help' && (
+          <HelpGuideView
+            user={user}
+            onStartSurfing={() => {
+              if (user.status === 'suspended') {
+                return;
+              }
+              setCurrentTab('autosurf');
+            }}
+            onOpenWebsites={() => setCurrentTab('websites')}
+            onOpenAntiCheat={() => setCurrentTab('anticheat')}
+            onOpenAudit={() => setCurrentTab('audit')}
+            onOpenReferral={() => setCurrentTab('referral')}
+            onOpenPricing={() => setPricingModalOpen(true)}
+          />
+        )}
       </main>
 
       {/* User Profile & Demo Account Switcher Modal */}
@@ -614,6 +835,7 @@ export default function App() {
         onUpdateProfile={handleUpdateCurrentUserData}
         onSwitchUser={handleSwitchUser}
         onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
+        onOpenHelp={() => setCurrentTab('help')}
       />
 
       {/* WordPress Authentication & Database Integration Modal */}
@@ -622,6 +844,7 @@ export default function App() {
         onClose={() => setWpAuthModalOpen(false)}
         currentUser={user}
         onWordPressLoginSuccess={handleWordPressLoginSuccess}
+        onWordPressLogout={handleWordPressLogout}
       />
 
       {/* Pricing / Top Up Modal */}
@@ -652,7 +875,13 @@ export default function App() {
             <span>{APP_CONFIG.tagline}</span>
           </div>
 
-          <div className="flex items-center gap-4 text-slate-400">
+          <div className="flex flex-wrap items-center gap-4 text-slate-400">
+            <button
+              onClick={handleReturnToLanding}
+              className="hover:text-slate-200 transition-colors cursor-pointer"
+            >
+              Beranda
+            </button>
             <button
               onClick={() => setCurrentTab('audit')}
               className="hover:text-slate-200 transition-colors cursor-pointer text-rose-400/90 font-medium"
@@ -682,6 +911,13 @@ export default function App() {
               className="hover:text-slate-200 transition-colors cursor-pointer"
             >
               Tarif & Beli Poin
+            </button>
+            <button
+              onClick={() => setCurrentTab('help')}
+              className="hover:text-slate-200 transition-colors cursor-pointer inline-flex items-center gap-1 text-emerald-400/90 font-medium"
+            >
+              <HelpCircle className="w-3.5 h-3.5" />
+              <span>Panduan & Bantuan</span>
             </button>
           </div>
 

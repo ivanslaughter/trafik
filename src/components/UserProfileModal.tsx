@@ -11,7 +11,8 @@ import {
   LogOut,
   Users,
   AlertTriangle,
-  Globe
+  Globe,
+  BookOpen
 } from 'lucide-react';
 import { UserProfile } from '../types';
 
@@ -23,6 +24,7 @@ interface UserProfileModalProps {
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
   onSwitchUser: (userId: string) => void;
   onOpenWordPressAuth?: () => void;
+  onOpenHelp?: () => void;
 }
 
 export const UserProfileModal: React.FC<UserProfileModalProps> = ({
@@ -33,6 +35,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onUpdateProfile,
   onSwitchUser,
   onOpenWordPressAuth,
+  onOpenHelp,
 }) => {
   const [name, setName] = useState<string>(user.name);
   const [email, setEmail] = useState<string>(user.email);
@@ -137,23 +140,41 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
           </button>
         </form>
 
-        {/* WordPress Bridge Button */}
-        {onOpenWordPressAuth && (
-          <div className="py-3 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={() => {
-                onClose();
-                onOpenWordPressAuth();
-              }}
-              className="w-full py-2.5 px-3 rounded-xl border border-blue-800/60 bg-blue-950/30 hover:bg-blue-900/40 text-blue-300 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
-            >
-              <div className="flex items-center gap-2">
-                <Globe className="w-4 h-4 text-blue-400" />
-                <span>Login / Integrasi Akun WordPress (velocity.web.id)</span>
-              </div>
-              <span className="text-[10px] text-blue-400 font-mono">REST API →</span>
-            </button>
+        {/* Help & WordPress Bridge Buttons */}
+        {(onOpenHelp || onOpenWordPressAuth) && (
+          <div className="py-3 border-t border-slate-800 space-y-2">
+            {onOpenHelp && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenHelp();
+                }}
+                className="w-full py-2.5 px-3 rounded-xl border border-emerald-800/60 bg-emerald-950/30 hover:bg-emerald-900/40 text-emerald-300 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-emerald-400" />
+                  <span>Pusat Bantuan & Panduan Penggunaan</span>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-mono">Buka →</span>
+              </button>
+            )}
+            {onOpenWordPressAuth && (
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onOpenWordPressAuth();
+                }}
+                className="w-full py-2.5 px-3 rounded-xl border border-blue-800/60 bg-blue-950/30 hover:bg-blue-900/40 text-blue-300 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-blue-400" />
+                  <span>Login / Integrasi Akun WordPress (velocity.web.id)</span>
+                </div>
+                <span className="text-[10px] text-blue-400 font-mono">REST API →</span>
+              </button>
+            )}
           </div>
         )}
 

@@ -559,7 +559,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
         const zoom = d3
           .zoom<SVGSVGElement, unknown>()
           .scaleExtent([0.7, 8])
-          .interpolate(d3.interpolateZoom.rho(1.2))
+          .interpolate((d3.interpolateZoom as typeof d3.interpolateZoom & { rho: (r: number) => typeof d3.interpolateZoom }).rho(1.2))
           .on('zoom', (event) => {
             const k = event.transform.k;
             containerSelection.attr('transform', event.transform);

@@ -3,26 +3,30 @@ import {
   X,
   Globe,
   Database,
-  Key,
   CheckCircle2,
   AlertCircle,
-  ExternalLink,
-  ShieldCheck,
-  RefreshCw,
   Server,
-  Lock,
   ArrowRight,
-  HelpCircle
+  Download,
+  UserPlus,
+  LogIn,
+  LogOut,
+  RefreshCw,
 } from 'lucide-react';
 import { UserProfile } from '../types';
-import { wpAuthService, WordPressConnectionConfig } from '../services/wordpressAuthService';
+import {
+  wpAuthService,
+  WordPressConnectionConfig,
+  BridgeHealthResponse,
+} from '../services/wordpressAuthService';
 import { APP_CONFIG } from '../config/appConfig';
 
 interface WordPressAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   currentUser: UserProfile;
-  onWordPressLoginSuccess: (userData: Partial<UserProfile>) => void;
+  onWordPressLoginSuccess: (userData: UserProfile) => void;
+  onWordPressLogout?: () => void;
 }
 
 export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
@@ -30,28 +34,49 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
   onClose,
   currentUser,
   onWordPressLoginSuccess,
+  onWordPressLogout,
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'config'>('login');
+  const [authAction, setAuthAction] = useState<'login' | 'register'>('login');
   const [config, setConfig] = useState<WordPressConnectionConfig>(wpAuthService.getConfig());
 
-  // Login Form
+  // Login / Register Form
+  const [name, setName] = useState<string>('');
+  const [city, setCity] = useState<string>('Jakarta');
   const [username, setUsername] = useState<string>('admin@velocity.web.id');
-  const [password, setPassword] = useState<string>('••••••••');
+  const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loginFeedback, setLoginFeedback] = useState<{ success: boolean; message: string } | null>(null);
 
-  // Connection Test
+  // Connection Test & Config Save Feedback
   const [isTestingConn, setIsTestingConn] = useState<boolean>(false);
-  const [testResult, setTestResult] = useState<{ reachable: boolean; message: string } | null>(null);
+  const [testResult, setTestResult] = useState<BridgeHealthResponse | null>(null);
+  const [configSavedMsg, setConfigSavedMsg] = useState<string>('');
 
   if (!isOpen) return null;
 
-  const handleLoginSubmit = async (e: React.FormEvent) => {
+  const isLiveConnected = wpAuthService.isLiveBridgeActive();
+
+  const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setLoginFeedback(null);
 
-    const result = await wpAuthService.loginWithWordPress(username, password);
+    if (authAction === 'register') {
+      const result = await wpAuthService.registerWithWordPress(name, username, password, city);
+      setIsLoading(false);
+      setLoginFeedback({ success: result.success, message: result.message });
+      if (result.success && result.user) {
+        onWordPressLoginSuccess(result.user);
+        setTimeout(() => {
+          onClose();
+          setLoginFeedback(null);
+        }, 1000);
+      }
+      return;
+    }
+
+    const result = await wpAuthService.loginWithWordPress(username, password || 'demo');
     setIsLoading(false);
     setLoginFeedback({ success: result.success, message: result.message });
 
@@ -60,22 +85,33 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
       setTimeout(() => {
         onClose();
         setLoginFeedback(null);
-      }, 1200);
+      }, 1000);
     }
   };
 
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
     wpAuthService.saveConfig(config);
-    alert('Konfigurasi integrasi WordPress dan Database berhasil disimpan!');
+    setConfigSavedMsg('Pengaturan WordPress Plugin Bridge berhasil disimpan.');
+    setTimeout(() => setConfigSavedMsg(''), 3000);
   };
 
   const handleTestConnection = async () => {
+    wpAuthService.saveConfig(config);
     setIsTestingConn(true);
     setTestResult(null);
     const res = await wpAuthService.testWordPressConnection();
     setIsTestingConn(false);
     setTestResult(res);
+  };
+
+  const handleDisconnect = () => {
+    wpAuthService.logout();
+    onWordPressLogout?.();
+    setLoginFeedback({
+      success: true,
+      message: 'Sesi WordPress Bridge diputuskan. Beralih kembali ke mode lokal.',
+    });
   };
 
   return (
@@ -84,6 +120,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
         <button
           onClick={onClose}
           className="absolute top-5 right-5 p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+          aria-label="Tutup modal"
         >
           <X className="w-5 h-5" />
         </button>
@@ -94,14 +131,19 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
             <Globe className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-100 flex items-center gap-2">
-              <span>Autentikasi & Database WordPress</span>
+            <h3 className="text-base font-bold text-slate-100 flex flex-wrap items-center gap-2">
+              <span>WordPress Plugin Bridge & MySQL</span>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-blue-950 text-blue-300 border border-blue-800">
-                velocity.web.id
+                {config.wpUrl.replace(/^https?:\/\//, '')}
               </span>
+              {isLiveConnected && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-emerald-950 text-emerald-300 border border-emerald-700">
+                  MySQL Terhubung
+                </span>
+              )}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Hubungkan akun pengguna dan sinkronisasi poin ke database MySQL WordPress Anda.
+              Sinkronisasi akun WordPress (`wp_users`), poin, kampanye website, dan log anti-cheat langsung ke MySQL Hostinger.
             </p>
           </div>
         </div>
@@ -116,7 +158,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Login dengan Akun WordPress
+            Login / Daftar Akun WordPress
           </button>
           <button
             onClick={() => setActiveTab('config')}
@@ -126,20 +168,90 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Konfigurasi Database & REST API
+            Setup Plugin Bridge & MySQL
           </button>
         </div>
 
-        {/* Tab 1: WordPress Login */}
+        {/* Tab 1: WordPress Login / Register */}
         {activeTab === 'login' && (
           <div className="mt-5 space-y-4">
-            <div className="p-3.5 rounded-xl border border-blue-900/40 bg-blue-950/20 text-xs text-slate-300 leading-relaxed">
-              <div className="font-semibold text-blue-300 flex items-center gap-1.5 mb-1">
-                <Database className="w-4 h-4 text-blue-400" />
-                <span>Autentikasi Terpadu (Single Sign-On WordPress)</span>
+            {isLiveConnected && (
+              <div className="p-3.5 rounded-xl border border-emerald-700/40 bg-emerald-950/30 text-xs flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-semibold text-emerald-300 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Terhubung ke MySQL WordPress sebagai {currentUser.name}</span>
+                  </div>
+                  <div className="text-slate-400 mt-0.5 font-mono text-[11px]">
+                    {currentUser.email} · Saldo: {currentUser.points.toLocaleString('id-ID')} Poin
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleDisconnect}
+                  className="px-3 py-1.5 rounded-lg border border-rose-500/40 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 font-medium inline-flex items-center gap-1.5 cursor-pointer transition-colors"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Putuskan Sesi</span>
+                </button>
               </div>
-              Pengguna di situs WordPress <strong>velocity.web.id</strong> (tabel <code className="text-blue-300">wp_users</code>) dapat langsung login di sini menggunakan username atau email mereka. Peran administrator di WordPress otomatis menjadi Administrator di sistem ini.
+            )}
+
+            <div className="p-3.5 rounded-xl border border-blue-900/40 bg-blue-950/20 text-xs text-slate-300 leading-relaxed">
+              <div className="font-semibold text-blue-300 flex items-center justify-between gap-2 mb-1">
+                <span className="flex items-center gap-1.5">
+                  <Database className="w-4 h-4 text-blue-400" />
+                  <span>Autentikasi Terpadu (`wp_users`)</span>
+                </span>
+                <span className="font-mono text-[10px] text-slate-400">
+                  Mode: {config.authMode === 'bridge' ? 'LIVE MYSQL BRIDGE' : 'SIMULASI LOKAL'}
+                </span>
+              </div>
+              {config.authMode === 'bridge' ? (
+                <span>
+                  Terhubung ke <code className="text-blue-300">/wp-json/trafik/v1</code>. Gunakan username/email &amp; password asli WordPress Anda di <strong>{config.wpUrl}</strong>.
+                </span>
+              ) : (
+                <span>
+                  Saat ini aktif dalam <strong>Mode Simulasi</strong>. Untuk menyimpan data nyata ke MySQL Hostinger, pasang plugin <strong>Trafik WP Bridge</strong> lalu aktifkan mode Live di tab <em>Setup Plugin Bridge &amp; MySQL</em>.
+                </span>
+              )}
             </div>
+
+            {config.authMode === 'bridge' && (
+              <div className="flex items-center gap-2 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthAction('login');
+                    setLoginFeedback(null);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                    authAction === 'login'
+                      ? 'bg-blue-600/20 border-blue-500/50 text-blue-300 font-semibold'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <LogIn className="w-3.5 h-3.5" />
+                  <span>Masuk Akun</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthAction('register');
+                    setLoginFeedback(null);
+                  }}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                    authAction === 'register'
+                      ? 'bg-emerald-600/20 border-emerald-500/50 text-emerald-300 font-semibold'
+                      : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'
+                  }`}
+                >
+                  <UserPlus className="w-3.5 h-3.5" />
+                  <span>Daftar Member Baru</span>
+                </button>
+              </div>
+            )}
 
             {loginFeedback && (
               <div
@@ -158,10 +270,40 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
               </div>
             )}
 
-            <form onSubmit={handleLoginSubmit} className="space-y-3">
+            <form onSubmit={handleAuthSubmit} className="space-y-3">
+              {authAction === 'register' && config.authMode === 'bridge' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Nama Lengkap
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                      placeholder="Budi Santoso"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">
+                      Kota Asal
+                    </label>
+                    <input
+                      type="text"
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
+                      placeholder="Jakarta"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Username / Email WordPress
+                  {authAction === 'register' ? 'Alamat Email' : 'Username / Email WordPress'}
                 </label>
                 <input
                   type="text"
@@ -179,29 +321,31 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                 </label>
                 <input
                   type="password"
-                  required
+                  required={config.authMode === 'bridge'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 focus:outline-none focus:border-blue-500 font-mono"
-                  placeholder="Password..."
+                  placeholder={config.authMode === 'bridge' ? 'Password WordPress Anda...' : 'Opsional di mode simulasi...'}
                 />
-              </div>
-
-              <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
-                <span>Target: <strong>{config.wpUrl}</strong></span>
-                <span className="text-slate-500 font-mono">Mode: {config.authMode.toUpperCase()}</span>
               </div>
 
               <button
                 type="submit"
                 disabled={isLoading}
-                className="w-full mt-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-blue-900/30"
+                className="w-full mt-2 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-60 text-white font-semibold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 shadow-lg shadow-blue-900/30"
               >
                 {isLoading ? (
-                  <span>Menghubungi WordPress REST API...</span>
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    <span>Menghubungi WordPress Plugin Bridge...</span>
+                  </>
                 ) : (
                   <>
-                    <span>Login & Hubungkan Akun WordPress</span>
+                    <span>
+                      {authAction === 'register'
+                        ? 'Daftar & Simpan ke MySQL WordPress'
+                        : 'Login & Sinkronkan Data MySQL'}
+                    </span>
                     <ArrowRight className="w-4 h-4" />
                   </>
                 )}
@@ -210,29 +354,43 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
           </div>
         )}
 
-        {/* Tab 2: Database & Architecture Configuration */}
+        {/* Tab 2: Plugin Setup & MySQL Architecture Configuration */}
         {activeTab === 'config' && (
           <div className="mt-5 space-y-4">
-            {/* Database Architecture Explanation */}
-            <div className="p-4 rounded-xl border border-slate-800 bg-slate-950/70 text-xs space-y-2">
-              <h4 className="font-bold text-slate-200 flex items-center gap-1.5">
-                <Server className="w-4 h-4 text-emerald-400" />
-                <span>Bagaimana Database WordPress Digunakan?</span>
-              </h4>
-              <p className="text-slate-400 leading-relaxed">
-                Di Hostinger, WordPress Anda berjalan di atas database <strong>MySQL / MariaDB</strong>. {APP_CONFIG.fullName} terhubung melalui <strong>WordPress REST API</strong>:
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 font-mono text-[11px]">
-                <div className="p-2 rounded bg-slate-900 border border-slate-800/80">
-                  <span className="text-blue-400 block font-semibold">Tabel `wp_users`:</span>
-                  <span className="text-slate-400">Menyimpan akun login, email, password hash, dan hak akses.</span>
+            {/* Download Plugin Banner */}
+            <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-950/20 text-xs space-y-2.5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h4 className="font-bold text-emerald-300 flex items-center gap-1.5">
+                    <Server className="w-4 h-4" />
+                    <span>Plugin WordPress: Trafik WP Bridge v1.0.0</span>
+                  </h4>
+                  <p className="text-slate-400 mt-1">
+                    Plugin mandiri (tanpa plugin JWT tambahan). Otomatis membuat tabel MySQL <code className="text-slate-200">wp_trafik_campaigns</code>, <code className="text-slate-200">wp_trafik_anticheat_logs</code>, dan menyimpan poin di <code className="text-slate-200">wp_usermeta</code>.
+                  </p>
                 </div>
-                <div className="p-2 rounded bg-slate-900 border border-slate-800/80">
-                  <span className="text-emerald-400 block font-semibold">Tabel `wp_usermeta`:</span>
-                  <span className="text-slate-400">Menyimpan saldo poin ({config.userMetaKey}) dan level VIP.</span>
-                </div>
+                <a
+                  href="./trafik-wp-bridge.zip"
+                  download="trafik-wp-bridge.zip"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shrink-0 shadow-lg shadow-emerald-950/40"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Unduh Plugin (.zip)</span>
+                </a>
               </div>
+              <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-300 pt-2 border-t border-emerald-900/40">
+                <li>Unduh file <code className="text-emerald-300">trafik-wp-bridge.zip</code> di atas.</li>
+                <li>Masuk ke <strong>WP Admin ({config.wpUrl}/wp-admin) → Plugins → Add New → Upload Plugin</strong>, lalu <strong>Activate</strong>.</li>
+                <li>Klik <strong>Uji Koneksi Bridge</strong> di bawah, ubah mode ke <strong>Live WordPress Plugin Bridge</strong>, lalu login di tab sebelah.</li>
+              </ol>
             </div>
+
+            {configSavedMsg && (
+              <div className="p-2.5 rounded-lg bg-emerald-950/50 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{configSavedMsg}</span>
+              </div>
+            )}
 
             <form onSubmit={handleSaveConfig} className="space-y-3">
               <div>
@@ -242,6 +400,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                 <div className="flex items-center gap-2">
                   <input
                     type="url"
+                    required
                     value={config.wpUrl}
                     onChange={(e) => setConfig({ ...config, wpUrl: e.target.value })}
                     className="flex-1 px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 font-mono focus:outline-none focus:border-blue-500"
@@ -251,49 +410,71 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                     type="button"
                     onClick={handleTestConnection}
                     disabled={isTestingConn}
-                    className="px-3 py-2 rounded-lg border border-slate-800 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer transition-colors shrink-0"
+                    className="px-3 py-2 rounded-lg border border-slate-700 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium cursor-pointer transition-colors shrink-0"
                   >
-                    {isTestingConn ? 'Menguji...' : 'Uji Koneksi'}
+                    {isTestingConn ? 'Menguji...' : 'Uji Koneksi Bridge'}
                   </button>
                 </div>
               </div>
 
               {testResult && (
                 <div
-                  className={`p-2.5 rounded-lg text-xs flex items-center gap-2 ${
-                    testResult.reachable
-                      ? 'bg-emerald-950/50 border border-emerald-500/40 text-emerald-300'
-                      : 'bg-amber-950/50 border border-amber-500/40 text-amber-300'
+                  className={`p-3 rounded-lg text-xs flex items-start gap-2 border ${
+                    testResult.pluginInstalled && testResult.dbReady
+                      ? 'bg-emerald-950/50 border-emerald-500/40 text-emerald-300'
+                      : testResult.reachable
+                      ? 'bg-amber-950/50 border-amber-500/40 text-amber-300'
+                      : 'bg-rose-950/50 border-rose-500/40 text-rose-300'
                   }`}
                 >
-                  {testResult.reachable ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                  {testResult.pluginInstalled && testResult.dbReady ? (
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                   ) : (
-                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                   )}
-                  <span>{testResult.message}</span>
+                  <div className="space-y-1">
+                    <div>{testResult.message}</div>
+                    {testResult.pluginInstalled && !config.authMode.includes('bridge') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const updated = { ...config, authMode: 'bridge' as const };
+                          setConfig(updated);
+                          wpAuthService.saveConfig(updated);
+                          setConfigSavedMsg('Mode Live WordPress Plugin Bridge diaktifkan!');
+                        }}
+                        className="underline font-semibold text-white hover:text-emerald-200 cursor-pointer"
+                      >
+                        Aktifkan Mode Live Bridge Sekarang →
+                      </button>
+                    )}
+                  </div>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Mode Autentikasi
+                    Mode Koneksi Database
                   </label>
                   <select
                     value={config.authMode}
-                    onChange={(e) => setConfig({ ...config, authMode: e.target.value as any })}
+                    onChange={(e) =>
+                      setConfig({
+                        ...config,
+                        authMode: e.target.value as WordPressConnectionConfig['authMode'],
+                      })
+                    }
                     className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 focus:outline-none focus:border-blue-500 cursor-pointer"
                   >
-                    <option value="simulated">Simulasi / LocalStorage (Bebas CORS)</option>
-                    <option value="jwt">Live WP REST API + JWT Token</option>
-                    <option value="app_password">Live WP Application Passwords</option>
+                    <option value="bridge">Live WordPress Plugin Bridge (MySQL)</option>
+                    <option value="simulated">Mode Simulasi / LocalStorage</option>
                   </select>
                 </div>
 
                 <div>
                   <label className="block text-xs font-medium text-slate-300 mb-1">
-                    Meta Key Poin WordPress
+                    Meta Key Poin di `wp_usermeta`
                   </label>
                   <input
                     type="text"
@@ -304,27 +485,16 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                 </div>
               </div>
 
-              <div className="pt-2 flex items-center justify-end gap-2">
+              <div className="pt-2 flex items-center justify-between gap-2 text-[11px] text-slate-500">
+                <span>{APP_CONFIG.fullName} · Endpoint: /wp-json/trafik/v1</span>
                 <button
                   type="submit"
-                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer transition-colors"
+                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold cursor-pointer transition-colors"
                 >
                   Simpan Pengaturan
                 </button>
               </div>
             </form>
-
-            {/* Plugin Setup instructions */}
-            <div className="pt-3 border-t border-slate-800 text-xs text-slate-400">
-              <span className="font-semibold text-slate-300 block mb-1">
-                Langkah Mengaktifkan JWT di WordPress velocity.web.id:
-              </span>
-              <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-400">
-                <li>Buka WP Admin (`velocity.web.id/wp-admin`) -&gt; Plugins -&gt; Add New.</li>
-                <li>Cari dan aktifkan plugin gratis: <strong>"JWT Authentication for WP REST API"</strong> atau gunakan fitur bawaan <strong>Application Passwords</strong> (tersedia gratis di WordPress 5.6+).</li>
-                <li>Tambahkan secret key di file <code className="text-slate-300">wp-config.php</code> WordPress: <code className="text-slate-300">define('JWT_AUTH_SECRET_KEY', 'kunci-rahasia-anda');</code>.</li>
-              </ol>
-            </div>
           </div>
         )}
       </div>
