@@ -43,7 +43,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
   // Login / Register Form
   const [name, setName] = useState<string>('');
   const [city, setCity] = useState<string>('Jakarta');
-  const [username, setUsername] = useState<string>('admin@velocity.web.id');
+  const [username, setUsername] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [loginFeedback, setLoginFeedback] = useState<{ success: boolean; message: string } | null>(null);
@@ -311,7 +311,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 focus:outline-none focus:border-blue-500"
-                  placeholder="admin@velocity.web.id"
+                  placeholder="trafik atau email@domain.id"
                 />
               </div>
 

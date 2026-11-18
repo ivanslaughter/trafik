@@ -22,6 +22,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenPricing,
   onOpenProfile,
 }) => {
+  const isAdmin = user.role === 'admin';
   const navItems = [
     { id: 'dashboard', label: 'Dasbor' },
     { id: 'autosurf', label: 'Selancar Trafik' },
@@ -29,7 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     { id: 'audit', label: 'Audit Kepatuhan' },
     { id: 'anticheat', label: 'Anti-Cheat' },
     { id: 'referral', label: 'Referral' },
-    { id: 'users', label: 'User' },
+    ...(isAdmin ? [{ id: 'users', label: 'User' }] : []),
   ];
 
   return (
@@ -87,7 +88,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onOpenProfile}
             className="flex items-center gap-1.5 p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg border border-slate-800 bg-slate-900 hover:border-slate-700 text-xs font-medium text-slate-200 cursor-pointer transition-colors"
-            title="Profil Akun & Ganti Pengguna"
+            title={isAdmin ? 'Profil Akun & Kontrol Admin' : 'Profil Akun Anda'}
           >
             <div className="w-5 h-5 rounded-full bg-slate-800 text-[10px] font-bold flex items-center justify-center text-emerald-400 border border-emerald-500/30">
               {user.name.substring(0, 1)}

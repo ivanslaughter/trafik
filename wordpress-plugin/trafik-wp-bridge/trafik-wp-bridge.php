@@ -947,6 +947,27 @@ add_action('rest_api_init', function () {
             ]);
         },
     ]);
+
+    // Admin Impersonate / Switch Session into another real WP user
+    register_rest_route($ns, '/admin/impersonate', [
+        'methods'             => 'POST',
+        'permission_callback' => 'trafik_bridge_permission_admin',
+        'callback'            => function (WP_REST_Request $request) {
+            $params = $request->get_json_params() ?: [];
+            $uid    = trafik_bridge_parse_wp_uid($params['userId'] ?? '');
+            $target = $uid ? get_user_by('id', $uid) : null;
+            if (!$target) {
+                return new WP_Error('user_not_found', 'Pengguna WordPress tidak ditemukan.', ['status' => 404]);
+            }
+
+            $token = trafik_bridge_issue_token($uid);
+            return rest_ensure_response([
+                'success' => true,
+                'token'   => $token,
+                'user'    => trafik_bridge_format_user($target),
+            ]);
+        },
+    ]);
 });
 
 /**

@@ -24,9 +24,13 @@ export interface BridgeHealthResponse {
   message: string;
 }
 
+const isHostedProduction =
+  typeof window !== 'undefined' &&
+  window.location.hostname.endsWith('velocity.web.id');
+
 const DEFAULT_CONFIG: WordPressConnectionConfig = {
   wpUrl: 'https://velocity.web.id',
-  authMode: 'simulated',
+  authMode: isHostedProduction ? 'bridge' : 'simulated',
   userMetaKey: 'tn_traffic_points',
   autoSyncPoints: true,
 };
@@ -34,6 +38,7 @@ const DEFAULT_CONFIG: WordPressConnectionConfig = {
 class WordPressAuthService {
   private config: WordPressConnectionConfig = DEFAULT_CONFIG;
   private token: string | null = null;
+  private adminReturnToken: string | null = null;
 
   constructor() {
     if (typeof localStorage !== 'undefined') {
@@ -55,6 +60,7 @@ class WordPressAuthService {
         }
       }
       this.token = localStorage.getItem('tn_wp_jwt_token');
+      this.adminReturnToken = localStorage.getItem('tn_wp_admin_return_token');
     }
   }
 
@@ -422,10 +428,65 @@ class WordPressAuthService {
     return res.ok && res.data ? res.data.user : null;
   }
 
+  public hasAdminReturnToken(): boolean {
+    return Boolean(this.adminReturnToken);
+  }
+
+  public async impersonateUser(
+    userId: string
+  ): Promise<{ success: boolean; user?: UserProfile; message?: string }> {
+    if (!this.isLiveBridgeActive()) {
+      return { success: false, message: 'Live Bridge tidak aktif.' };
+    }
+
+    const currentAdminToken = this.adminReturnToken || this.token;
+    const res = await this.request<{ success: boolean; token: string; user: UserProfile }>(
+      '/admin/impersonate',
+      {
+        method: 'POST',
+        body: JSON.stringify({ userId }),
+      }
+    );
+
+    if (!res.ok || !res.data?.token) {
+      return {
+        success: false,
+        message: res.error || 'Gagal beralih sesi pengguna.',
+      };
+    }
+
+    if (currentAdminToken && !this.adminReturnToken) {
+      this.adminReturnToken = currentAdminToken;
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('tn_wp_admin_return_token', currentAdminToken);
+      }
+    }
+
+    this.token = res.data.token;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('tn_wp_jwt_token', res.data.token);
+    }
+
+    return { success: true, user: res.data.user };
+  }
+
+  public async returnToAdminSession(): Promise<UserProfile | null> {
+    if (!this.adminReturnToken) return null;
+    this.token = this.adminReturnToken;
+    this.adminReturnToken = null;
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem('tn_wp_jwt_token', this.token);
+      localStorage.removeItem('tn_wp_admin_return_token');
+    }
+    return this.fetchMe();
+  }
+
   public logout() {
     this.token = null;
+    this.adminReturnToken = null;
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('tn_wp_jwt_token');
+      localStorage.removeItem('tn_wp_admin_return_token');
     }
   }
 }

@@ -131,14 +131,11 @@ export default function App() {
     }
     if (me.role === 'admin') {
       const adminUsers = await wpAuthService.fetchAdminUsers();
-      if (adminUsers && adminUsers.length > 0) {
+      if (adminUsers) {
         setAllUsers(adminUsers);
       }
     } else {
-      setAllUsers((prev) => {
-        const exists = prev.some((u) => u.id === me.id || u.email === me.email);
-        return exists ? prev.map((u) => (u.email === me.email ? me : u)) : [me, ...prev];
-      });
+      setAllUsers([me]);
     }
   }, []);
 
@@ -177,6 +174,7 @@ export default function App() {
   const handleWordPressLoginSuccess = (wpUserData: UserProfile) => {
     if (wpAuthService.isLiveBridgeActive()) {
       setUser(wpUserData);
+      setAllUsers([wpUserData]);
       syncFromWordPressBridge();
       handleEnterWorkspace('dashboard');
       return;
@@ -191,7 +189,7 @@ export default function App() {
       const newWpUser: UserProfile = {
         ...wpUserData,
         id: wpUserData.id || 'usr_wp_' + Math.random().toString(36).substring(2, 7),
-        lastActive: 'Terhubung ke WordPress velocity.web.id',
+        lastActive: 'Mode Simulasi',
       };
       setUser(newWpUser);
       setAllUsers((prev) => [newWpUser, ...prev]);
@@ -200,6 +198,7 @@ export default function App() {
   };
 
   const handleWordPressLogout = () => {
+    wpAuthService.logout();
     setUser(INITIAL_USER);
     setAllUsers(INITIAL_ALL_USERS);
     setUserWebsites(INITIAL_USER_WEBSITES);
@@ -235,10 +234,33 @@ export default function App() {
     }
   };
 
-  const handleSwitchUser = (userId: string) => {
+  const handleSwitchUser = async (userId: string) => {
+    if (user.role !== 'admin' && !wpAuthService.hasAdminReturnToken()) {
+      return;
+    }
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      const res = await wpAuthService.impersonateUser(userId);
+      if (res.success && res.user) {
+        setUser(res.user);
+        setCurrentTab('dashboard');
+        await syncFromWordPressBridge();
+      }
+      return;
+    }
+
     const targetUser = allUsers.find((u) => u.id === userId);
     if (targetUser) {
       setUser(targetUser);
+    }
+  };
+
+  const handleReturnToAdmin = async () => {
+    const adminUser = await wpAuthService.returnToAdminSession();
+    if (adminUser) {
+      setUser(adminUser);
+      setCurrentTab('users');
+      await syncFromWordPressBridge();
     }
   };
 
@@ -714,6 +736,23 @@ export default function App() {
         onInspect={handleInspectAntiCheatToast}
       />
 
+      {/* Admin Impersonation Return Banner */}
+      {wpAuthService.hasAdminReturnToken() && (
+        <div className="bg-amber-950/80 border-b border-amber-700/60 px-4 py-2.5 text-xs text-amber-200">
+          <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
+            <span>
+              Mode Peninjauan Admin: Anda sedang masuk sebagai <strong>{user.name}</strong> ({user.email}).
+            </span>
+            <button
+              onClick={handleReturnToAdmin}
+              className="px-3 py-1 rounded-md bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold cursor-pointer shrink-0 transition-colors"
+            >
+              Kembali ke Akun Admin
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Account Suspended Alert Banner (if user is banned) */}
       {user.status === 'suspended' && (
         <div className="bg-rose-950/90 border-b border-rose-800/80 px-4 py-3 text-xs text-rose-200">
@@ -724,12 +763,14 @@ export default function App() {
                 <strong>Akun Ditangguhkan:</strong> {user.suspendReason || 'Terdeteksi aktivitas mencurigakan oleh sistem anti-cheat.'}
               </span>
             </div>
-            <button
-              onClick={() => setProfileModalOpen(true)}
-              className="text-white underline underline-offset-2 hover:text-rose-300 font-semibold cursor-pointer shrink-0"
-            >
-              Ganti Akun Demo
-            </button>
+            {user.role === 'admin' && (
+              <button
+                onClick={() => setProfileModalOpen(true)}
+                className="text-white underline underline-offset-2 hover:text-rose-300 font-semibold cursor-pointer shrink-0"
+              >
+                Kelola Akun
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -797,7 +838,7 @@ export default function App() {
 
         {currentTab === 'referral' && <ReferralView user={user} />}
 
-        {currentTab === 'users' && (
+        {currentTab === 'users' && user.role === 'admin' && (
           <UserManagementView
             users={allUsers}
             currentUser={user}
@@ -805,6 +846,24 @@ export default function App() {
             onAddUser={handleAddUser}
             onSwitchUser={handleSwitchUser}
             onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
+          />
+        )}
+
+        {currentTab === 'users' && user.role !== 'admin' && (
+          <DashboardView
+            user={user}
+            websites={userWebsites}
+            logs={auditLogs}
+            onStartSurfing={() => {
+              if (user.status === 'suspended') {
+                return;
+              }
+              setCurrentTab('autosurf');
+            }}
+            onOpenWebsites={() => setCurrentTab('websites')}
+            onOpenAntiCheat={() => setCurrentTab('anticheat')}
+            onOpenPricing={() => setPricingModalOpen(true)}
+            onOpenHelp={() => setCurrentTab('help')}
           />
         )}
 
@@ -826,16 +885,20 @@ export default function App() {
         )}
       </main>
 
-      {/* User Profile & Demo Account Switcher Modal */}
+      {/* User Profile & Admin Switcher Modal */}
       <UserProfileModal
         isOpen={profileModalOpen}
         onClose={() => setProfileModalOpen(false)}
         user={user}
         allUsers={allUsers}
+        isLiveConnected={wpAuthService.isLiveBridgeActive()}
+        canReturnToAdmin={wpAuthService.hasAdminReturnToken()}
         onUpdateProfile={handleUpdateCurrentUserData}
         onSwitchUser={handleSwitchUser}
+        onReturnToAdmin={handleReturnToAdmin}
         onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
         onOpenHelp={() => setCurrentTab('help')}
+        onLogout={handleWordPressLogout}
       />
 
       {/* WordPress Authentication & Database Integration Modal */}
@@ -888,12 +951,14 @@ export default function App() {
             >
               Audit Kepatuhan (Anti-Judi/18+)
             </button>
-            <button
-              onClick={() => setCurrentTab('users')}
-              className="hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              Manajemen Pengguna
-            </button>
+            {user.role === 'admin' && (
+              <button
+                onClick={() => setCurrentTab('users')}
+                className="hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                Manajemen Pengguna
+              </button>
+            )}
             <button
               onClick={() => setCurrentTab('anticheat')}
               className="hover:text-slate-200 transition-colors cursor-pointer"
