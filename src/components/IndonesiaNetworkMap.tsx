@@ -1113,15 +1113,12 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           <div className="flex items-center gap-2">
             <Globe className="w-5 h-5 text-emerald-400" />
             <h3 className="text-base font-bold text-slate-100">
-              Peta Distribusi Trafik Nusantara (D3-SVG Real-Time)
+              Peta Distribusi Trafik
             </h3>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/50 font-mono font-semibold">
               38 Provinsi Resmi · 515 Daerah
             </span>
           </div>
-          <p className="text-xs text-slate-400 mt-1">
-            Visualisasi choropleth D3 dari <code className="text-slate-300 font-mono">/public/maps/indonesia.svg</code> mencakup seluruh 38 Provinsi Nusantara (termasuk Papua Barat Daya, Papua Tengah, Papua Pegunungan, dan Papua Selatan).
-          </p>
         </div>
 
         {/* Global Traffic Counters */}
