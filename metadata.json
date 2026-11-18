@@ -1,0 +1,6 @@
+{
+  "name": "TrafikNusantara - Pertukaran Trafik & Anti-Cheat",
+  "description": "Platform pertukaran trafik website Indonesia dengan sistem anti-curang canggih untuk distribusi poin yang adil dan penargetan audiens lokal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
