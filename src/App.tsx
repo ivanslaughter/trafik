@@ -328,6 +328,14 @@ export default function App() {
 
   // Real-Time Anti-Cheat Toast Notifications
   const [antiCheatToasts, setAntiCheatToasts] = useState<AntiCheatToastItem[]>([]);
+  const currentTabRef = useRef<string>(currentTab);
+  currentTabRef.current = currentTab;
+
+  useEffect(() => {
+    if (currentTab !== 'autosurf' && currentTab !== 'anticheat') {
+      setAntiCheatToasts([]);
+    }
+  }, [currentTab]);
 
   // Subscribe to real-time Anti-Cheat Engine events
   useEffect(() => {
@@ -336,6 +344,12 @@ export default function App() {
 
       if (wpAuthService.isLiveBridgeActive() && entry.type !== 'HEARTBEAT_VERIFIED') {
         wpAuthService.pushLog(entry);
+      }
+
+      // Only show real-time anti-cheat toast notifications during Surf Mode or manual Anti-Cheat Console tests
+      const activeView = currentTabRef.current;
+      if (activeView !== 'autosurf' && activeView !== 'anticheat') {
+        return;
       }
 
       // Real-time Anti-Cheat Toast Notification:

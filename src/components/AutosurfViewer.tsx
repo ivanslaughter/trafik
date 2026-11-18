@@ -77,8 +77,15 @@ export const AutosurfViewer: React.FC<AutosurfViewerProps> = ({
     ? currentSite.iframeAllowed === false || Boolean(forcedTabSiteIds[currentSite.id])
     : false;
   const timerRef = useRef<number | null>(null);
+  const showChallengeRef = useRef<boolean>(showChallenge);
+  showChallengeRef.current = showChallenge;
 
-  // Initialize anti-cheat engine hooks
+  // Sync paused state to anti-cheat engine so paused/challenge states don't decay entropy
+  useEffect(() => {
+    antiCheatEngine.setSurfPaused(isPaused || showChallenge);
+  }, [isPaused, showChallenge]);
+
+  // Initialize anti-cheat engine strictly while Surf Mode is active
   useEffect(() => {
     const unsubscribe = antiCheatEngine.subscribe((entry: AntiCheatLogEntry) => {
       setAntiCheatStatus(antiCheatEngine.getStatus());
@@ -88,7 +95,7 @@ export const AutosurfViewer: React.FC<AutosurfViewerProps> = ({
         setPauseReason('Tab browser di latar belakang. Kunjungan dijeda untuk memastikan tayangan asli.');
       } else if (entry.type === 'VISIBILITY_RESTORED') {
         // Automatically resume if not blocked by challenge
-        if (!showChallenge) {
+        if (!showChallengeRef.current) {
           setIsPaused(false);
           setPauseReason('');
         }
@@ -103,12 +110,14 @@ export const AutosurfViewer: React.FC<AutosurfViewerProps> = ({
       }
     });
 
-    antiCheatEngine.init();
+    antiCheatEngine.startSurfing();
+    setAntiCheatStatus(antiCheatEngine.getStatus());
 
     return () => {
       unsubscribe();
+      antiCheatEngine.stopSurfing();
     };
-  }, [showChallenge]);
+  }, []);
 
   // Set initial site duration & reset iframe loaded flag when site changes
   useEffect(() => {

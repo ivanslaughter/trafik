@@ -34,6 +34,9 @@ class AntiCheatEngine {
   private heartbeatSequence: number = 0;
   private entropyDecayInterval: number | null = null;
   private isEngineStarted: boolean = false;
+  private isSurfingActive: boolean = false;
+  private isPaused: boolean = false;
+  private lowEntropyAlertSent: boolean = false;
 
   constructor() {
     this.currentSessionId = 'sess_' + Math.random().toString(36).substring(2, 9);
@@ -44,7 +47,7 @@ class AntiCheatEngine {
       this.listeners.add(callback);
     }
 
-    if (this.isEngineStarted) return;
+    if (this.isEngineStarted || !this.isSurfingActive) return;
     this.isEngineStarted = true;
 
     // 1. Setup Document Visibility & Focus Listener
@@ -63,6 +66,37 @@ class AntiCheatEngine {
     this.entropyDecayInterval = window.setInterval(() => {
       this.runPeriodicEntropyAudit();
     }, 1000);
+  }
+
+  public startSurfing() {
+    this.isSurfingActive = true;
+    this.isPaused = false;
+    this.lowEntropyAlertSent = false;
+    this.status.tabFocused = typeof document !== 'undefined' ? document.visibilityState === 'visible' : true;
+    this.status.mouseEntropyScore = 85;
+    this.status.consecutiveLowEntropySeconds = 0;
+    this.status.concurrencyLockActive = false;
+    this.status.suspicionLevel = 'clean';
+    this.mousePoints = [];
+    this.init();
+  }
+
+  public stopSurfing() {
+    this.isSurfingActive = false;
+    this.isPaused = false;
+    this.lowEntropyAlertSent = false;
+    this.status.consecutiveLowEntropySeconds = 0;
+    this.status.mouseEntropyScore = 85;
+    this.status.concurrencyLockActive = false;
+    this.status.suspicionLevel = 'clean';
+    this.destroy();
+  }
+
+  public setSurfPaused(paused: boolean) {
+    this.isPaused = paused;
+    if (!paused) {
+      this.lowEntropyAlertSent = false;
+    }
   }
 
   public subscribe(callback: AntiCheatEventCallback): () => void {
@@ -89,6 +123,7 @@ class AntiCheatEngine {
   }
 
   private handleVisibilityChange = () => {
+    if (!this.isSurfingActive) return;
     const isVisible = document.visibilityState === 'visible';
     this.status.tabFocused = isVisible;
 
@@ -175,9 +210,14 @@ class AntiCheatEngine {
     const organicScore = Math.min(100, Math.round(totalAngleChange * 15 + velocityDeltas * 8));
     this.status.mouseEntropyScore = Math.max(10, Math.min(100, Math.round(this.status.mouseEntropyScore * 0.7 + organicScore * 0.3)));
     this.status.consecutiveLowEntropySeconds = 0;
+    this.lowEntropyAlertSent = false;
   }
 
   private runPeriodicEntropyAudit() {
+    if (!this.isSurfingActive || this.isPaused || !this.status.tabFocused) {
+      return;
+    }
+
     // Decay entropy if no user movement
     if (this.status.mouseEntropyScore > 20) {
       this.status.mouseEntropyScore = Math.max(10, this.status.mouseEntropyScore - 3);
@@ -185,8 +225,13 @@ class AntiCheatEngine {
       this.status.consecutiveLowEntropySeconds += 1;
     }
 
-    // If zero interaction for too long, raise suspicion
-    if (this.status.consecutiveLowEntropySeconds >= 35 && this.status.suspicionLevel !== 'flagged') {
+    // Emit once when zero human interaction persists >= 35s during active surfing
+    if (
+      this.status.consecutiveLowEntropySeconds >= 35 &&
+      !this.lowEntropyAlertSent &&
+      this.status.suspicionLevel !== 'flagged'
+    ) {
+      this.lowEntropyAlertSent = true;
       this.status.suspicionLevel = 'suspicious';
       this.emitLog({
         type: 'LOW_ENTROPY_DETECTED',
@@ -204,6 +249,7 @@ class AntiCheatEngine {
     try {
       this.broadcastChannel = new BroadcastChannel(CHANNEL_NAME);
       this.broadcastChannel.onmessage = (event) => {
+        if (!this.isSurfingActive) return;
         if (event.data?.type === 'SURF_ACTIVE_PING') {
           // Another tab is surfing!
           if (event.data.sessionId !== this.currentSessionId) {
@@ -323,6 +369,7 @@ class AntiCheatEngine {
       this.status.suspicionLevel = 'clean';
       this.status.mouseEntropyScore = 90;
       this.status.consecutiveLowEntropySeconds = 0;
+      this.lowEntropyAlertSent = false;
       this.emitLog({
         type: 'HUMAN_POP_PASSED',
         title: 'Verifikasi Keberadaan Manusia Berhasil',
@@ -445,8 +492,12 @@ class AntiCheatEngine {
       window.removeEventListener('mousemove', this.handleMouseMove);
       if (this.entropyDecayInterval) {
         clearInterval(this.entropyDecayInterval);
+        this.entropyDecayInterval = null;
       }
-      this.broadcastChannel?.close();
+      if (this.broadcastChannel) {
+        this.broadcastChannel.close();
+        this.broadcastChannel = null;
+      }
     }
     this.isEngineStarted = false;
   }
