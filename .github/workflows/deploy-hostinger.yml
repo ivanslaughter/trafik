@@ -1,0 +1,50 @@
+name: Build & Publish Hostinger Branch
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-production:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source (main)
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Build Vite production bundle
+        run: npm run build
+
+      - name: Prepare Hostinger static files (.htaccess & WP Bridge zip)
+        run: |
+          rm -f dist/trafik-deployment.zip dist/trafik-deployment.tar.gz
+          if [ -f public/.htaccess ]; then
+            cp public/.htaccess dist/.htaccess
+          fi
+          if [ -d wordpress-plugin/trafik-wp-bridge ]; then
+            python3 -c "import shutil; shutil.make_archive('dist/trafik-wp-bridge', 'zip', 'wordpress-plugin', 'trafik-wp-bridge')"
+          fi
+
+      - name: Push compiled dist to production branch
+        run: |
+          cd dist
+          git init
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b production
+          git add -A
+          git commit -m "Deployable build from ${{ github.sha }}"
+          git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git"
+          git push -f origin production

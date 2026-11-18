@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Sparkles, User, ShieldCheck } from 'lucide-react';
+import { Play, Square, Sparkles, User, ShieldCheck } from 'lucide-react';
 import { UserProfile } from '../types';
 import { APP_NAME } from '../config/appConfig';
 
@@ -100,6 +100,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Primary Action Button: Start/Stop Autosurf */}
           <button
             onClick={onToggleSurfing}
+            title={
+              isSurfing
+                ? 'Hentikan sesi selancar dan kembali ke Dasbor'
+                : 'Mulai sesi Selancar Trafik'
+            }
             className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-sm ${
               isSurfing
                 ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/30'
@@ -108,11 +113,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           >
             {isSurfing ? (
               <>
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-                </span>
-                <span className="hidden sm:inline">Buka Selancar</span>
+                <Square className="w-3 h-3 fill-current" />
+                <span>Hentikan Selancar</span>
               </>
             ) : (
               <>
