@@ -1253,17 +1253,16 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
         </div>
       </div>
 
-      {/* Main Map Visual Canvas & Top Provinces Sidebar Layout */}
-      <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 mt-4">
-        {/* Left 3 Cols: SVG Interactive Canvas */}
+      {/* Full-Width Interactive Map Canvas */}
+      <div className="mt-4 space-y-4">
         <div
           ref={mapViewportRef}
-          className="xl:col-span-3 relative w-full aspect-[21/10] min-h-[340px] max-h-[480px] bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner"
+          className="relative w-full aspect-[21/9] min-h-[340px] max-h-[500px] bg-slate-950 rounded-xl border border-slate-800 overflow-hidden flex items-center justify-center shadow-inner"
         >
           {isLoading && (
             <div className="flex flex-col items-center gap-3 text-slate-400 z-10">
               <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin" />
-              <span className="text-xs font-medium">Memuat dan mengindeks D3 SVG Peta Indonesia...</span>
+              <span className="text-xs font-medium">Memuat dan mengindeks Peta Indonesia...</span>
             </div>
           )}
 
@@ -1347,45 +1346,52 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           )}
         </div>
 
-        {/* Right 1 Col: Top Traffic Leaderboard per Provinsi */}
-        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4 flex flex-col justify-between space-y-4">
-          <div>
-            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-                <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
-                Top 5 Provinsi Teraktif
+        {/* Horizontal Top 5 Provinsi Teraktif Box Beneath Map */}
+        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+            <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+              <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+              Top 5 Provinsi Teraktif
+            </span>
+            <div className="flex items-center gap-3 text-[11px] text-slate-400">
+              <span className="flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                Presisi IP ISP Lokal
               </span>
+              <span className="text-slate-700">·</span>
               <span className="text-[10px] text-slate-500 font-mono">Live Ranking</span>
             </div>
+          </div>
 
-            <div className="mt-3 space-y-2.5">
-              {topProvinces.map((prov, idx) => {
-                const percent = Math.min(100, Math.round((prov.surfers / 520) * 100));
-                const isSelected = currentRegion === prov.regionId;
+          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+            {topProvinces.map((prov, idx) => {
+              const percent = Math.min(100, Math.round((prov.surfers / 520) * 100));
+              const isSelected = currentRegion === prov.regionId;
 
-                return (
-                  <div
-                    key={prov.name}
-                    onClick={() => handleSelectProvince(prov.name, prov.regionId)}
-                    className={`p-2.5 rounded-lg border transition-all cursor-pointer ${
-                      isSelected
-                        ? 'bg-emerald-950/70 border-emerald-600/60 shadow-sm'
-                        : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full bg-slate-800 text-slate-300 font-mono font-bold text-[10px] flex items-center justify-center">
+              return (
+                <div
+                  key={prov.name}
+                  onClick={() => handleSelectProvince(prov.name, prov.regionId)}
+                  className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
+                    isSelected
+                      ? 'bg-emerald-950/70 border-emerald-600/60 shadow-sm'
+                      : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/50'
+                  }`}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-1.5 text-xs">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-4 h-4 rounded-full bg-slate-800 text-slate-300 font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
                           {idx + 1}
                         </span>
-                        <span className="font-medium text-slate-200">{prov.name}</span>
+                        <span className="font-medium text-slate-200 truncate">{prov.name}</span>
                       </div>
-                      <span className="font-mono font-bold text-emerald-400 text-xs tabular-nums">
+                      <span className="font-mono font-bold text-emerald-400 text-[11px] tabular-nums shrink-0">
                         {metricMode === 'hits'
                           ? `${prov.dailyHits.toLocaleString('id-ID')} hits`
                           : metricMode === 'quality'
                           ? `${prov.antiCheatScore}%`
-                          : `${prov.surfers} surfers`}
+                          : `${prov.surfers}`}
                       </span>
                     </div>
 
@@ -1396,22 +1402,14 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
                         style={{ width: `${percent}%` }}
                       />
                     </div>
-
-                    <div className="text-[10px] text-slate-500 mt-1 truncate">
-                      Hub: {prov.topCities.slice(0, 3).join(', ')}
-                    </div>
                   </div>
-                );
-              })}
-            </div>
-          </div>
 
-          <div className="pt-3 border-t border-slate-800 text-[11px] text-slate-400 flex items-center justify-between">
-            <span className="flex items-center gap-1 text-slate-400">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-              Presisi IP ISP Lokal
-            </span>
-            <span className="text-slate-500 font-mono">D3-v7</span>
+                  <div className="text-[10px] text-slate-500 mt-2 truncate">
+                    Hub: {prov.topCities.slice(0, 3).join(', ')}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </div>
