@@ -354,14 +354,14 @@ interface RadarNode {
 // Bounding Center & Zoom scale for each Indonesian region on 1630.898 x 600 viewBox
 export const REGION_BOUNDS: Record<IndonesianRegionId, { x: number; y: number; k: number }> = {
   nasional: { x: 815.45, y: 300, k: 1 },
-  jabodetabek: { x: 420, y: 430, k: 4.8 },
-  jawa_barat: { x: 450, y: 455, k: 3.6 },
-  jawa_tengah: { x: 535, y: 460, k: 3.6 },
-  jawa_timur: { x: 630, y: 470, k: 3.6 },
-  sumatera: { x: 210, y: 220, k: 1.8 },
-  bali_nusra: { x: 790, y: 520, k: 3.2 },
-  kalimantan: { x: 640, y: 260, k: 2.2 },
-  sulawesi: { x: 1250, y: 320, k: 1.5 },
+  jabodetabek: { x: 419, y: 429, k: 4.8 },
+  jawa_barat: { x: 446, y: 455, k: 3.6 },
+  jawa_tengah: { x: 538, y: 467, k: 3.6 },
+  jawa_timur: { x: 628, y: 475, k: 3.4 },
+  sumatera: { x: 215, y: 220, k: 1.8 },
+  bali_nusra: { x: 830, y: 525, k: 2.8 },
+  kalimantan: { x: 650, y: 225, k: 2.2 },
+  sulawesi: { x: 1230, y: 310, k: 1.5 },
 };
 
 // Explicit readable labels for Regional Filter buttons
@@ -377,66 +377,67 @@ export const REGION_SHORT_LABELS: Record<IndonesianRegionId, string> = {
   sulawesi: 'Sulawesi & Papua',
 };
 
-// Province coordinates for direct zoom when clicked on leaderboard or map
+// Province coordinates for direct zoom when clicked on leaderboard or map (exact SVG centroids)
 export const PROVINCE_COORDINATES: Record<string, { x: number; y: number; k: number }> = {
-  'DKI Jakarta': { x: 420, y: 428, k: 5.5 },
-  'Jawa Barat': { x: 447, y: 453, k: 3.8 },
-  'Jawa Timur': { x: 631, y: 470, k: 3.8 },
-  'Jawa Tengah': { x: 547, y: 455, k: 3.8 },
-  'Sumatera Utara': { x: 130, y: 76, k: 3.2 },
-  'Banten': { x: 390, y: 430, k: 4.5 },
-  'Bali': { x: 717, y: 515, k: 5.0 },
-  'Daerah Istimewa Yogyakarta': { x: 525, y: 475, k: 5.5 },
-  'Sumatera Selatan': { x: 260, y: 250, k: 3.0 },
-  'Riau': { x: 200, y: 190, k: 3.0 },
-  'Kalimantan Timur': { x: 773, y: 247, k: 3.0 },
-  'Sulawesi Selatan': { x: 868, y: 393, k: 3.2 },
-  'Lampung': { x: 340, y: 390, k: 3.5 },
-  'Kalimantan Barat': { x: 505, y: 275, k: 2.8 },
-  'Sumatera Barat': { x: 170, y: 220, k: 3.2 },
-  'Nusa Tenggara Barat': { x: 780, y: 525, k: 3.8 },
-  'Kalimantan Selatan': { x: 660, y: 370, k: 3.2 },
-  'Aceh': { x: 60, y: 60, k: 3.2 },
-  'Jambi': { x: 230, y: 260, k: 3.2 },
-  'Nusa Tenggara Timur': { x: 920, y: 540, k: 3.0 },
-  'Sulawesi Utara': { x: 1020, y: 140, k: 3.5 },
-  'Kalimantan Tengah': { x: 590, y: 300, k: 2.8 },
-  'Kepulauan Riau': { x: 300, y: 160, k: 3.8 },
-  'Bengkulu': { x: 230, y: 330, k: 3.5 },
-  'Kepulauan Bangka Belitung': { x: 350, y: 290, k: 3.5 },
-  'Sulawesi Tengah': { x: 900, y: 270, k: 3.0 },
-  'Kalimantan Utara': { x: 730, y: 150, k: 3.2 },
-  'Sulawesi Tenggara': { x: 950, y: 400, k: 3.2 },
-  'Maluku': { x: 1179, y: 338, k: 3.0 },
-  'Maluku Utara': { x: 1140, y: 190, k: 3.2 },
-  'Gorontalo': { x: 950, y: 190, k: 3.8 },
-  'Sulawesi Barat': { x: 840, y: 320, k: 3.5 },
-  'Papua': { x: 1598, y: 291, k: 3.0 },
-  'Papua Barat': { x: 1363, y: 235, k: 3.2 },
-  'Papua Barat Daya': { x: 1289, y: 237, k: 3.5 },
-  'Papua Tengah': { x: 1511, y: 357, k: 3.0 },
-  'Papua Pegunungan': { x: 1558, y: 348, k: 3.2 },
-  'Papua Selatan': { x: 1558, y: 506, k: 3.0 },
+  'DKI Jakarta': { x: 419, y: 429, k: 5.5 },
+  'Jawa Barat': { x: 446, y: 455, k: 3.8 },
+  'Jawa Timur': { x: 628, y: 478, k: 3.6 },
+  'Jawa Tengah': { x: 538, y: 467, k: 3.8 },
+  'Sumatera Utara': { x: 143, y: 132, k: 3.2 },
+  'Banten': { x: 393, y: 439, k: 4.5 },
+  'Bali': { x: 713, y: 506, k: 5.0 },
+  'Daerah Istimewa Yogyakarta': { x: 547, y: 490, k: 5.5 },
+  'Sumatera Selatan': { x: 324, y: 324, k: 3.0 },
+  'Riau': { x: 240, y: 191, k: 3.0 },
+  'Kalimantan Timur': { x: 760, y: 193, k: 3.0 },
+  'Sulawesi Selatan': { x: 891, y: 342, k: 3.2 },
+  'Lampung': { x: 354, y: 384, k: 3.5 },
+  'Kalimantan Barat': { x: 571, y: 213, k: 2.8 },
+  'Sumatera Barat': { x: 193, y: 240, k: 3.2 },
+  'Nusa Tenggara Barat': { x: 797, y: 515, k: 3.8 },
+  'Kalimantan Selatan': { x: 724, y: 316, k: 3.2 },
+  'Aceh': { x: 67, y: 60, k: 3.2 },
+  'Jambi': { x: 273, y: 270, k: 3.2 },
+  'Nusa Tenggara Timur': { x: 963, y: 538, k: 3.0 },
+  'Sulawesi Utara': { x: 1046, y: 165, k: 3.5 },
+  'Kalimantan Tengah': { x: 652, y: 266, k: 2.8 },
+  'Kepulauan Riau': { x: 369, y: 156, k: 3.8 },
+  'Bengkulu': { x: 259, y: 335, k: 3.5 },
+  'Kepulauan Bangka Belitung': { x: 408, y: 296, k: 3.5 },
+  'Sulawesi Tengah': { x: 928, y: 245, k: 3.0 },
+  'Kalimantan Utara': { x: 751, y: 107, k: 3.2 },
+  'Sulawesi Tenggara': { x: 959, y: 356, k: 3.2 },
+  'Maluku': { x: 1233, y: 377, k: 3.0 },
+  'Maluku Utara': { x: 1153, y: 202, k: 3.2 },
+  'Gorontalo': { x: 970, y: 185, k: 3.8 },
+  'Sulawesi Barat': { x: 862, y: 297, k: 3.5 },
+  'Papua': { x: 1541, y: 301, k: 3.0 },
+  'Papua Barat': { x: 1369, y: 303, k: 3.2 },
+  'Papua Barat Daya': { x: 1309, y: 249, k: 3.5 },
+  'Papua Tengah': { x: 1472, y: 348, k: 3.0 },
+  'Papua Pegunungan': { x: 1574, y: 359, k: 3.2 },
+  'Papua Selatan': { x: 1578, y: 446, k: 3.0 },
 };
 
+// Exact city coordinates verified inside /public/maps/indonesia.svg (1630.898 x 600 viewBox)
 const STRATEGIC_RADAR_NODES: RadarNode[] = [
-  { name: 'Medan', province: 'Sumatera Utara', x: 130, y: 76, surfers: 85 },
-  { name: 'Palembang', province: 'Sumatera Selatan', x: 260, y: 250, surfers: 45 },
-  { name: 'Jakarta (IDC)', province: 'DKI Jakarta', x: 420, y: 428, surfers: 520 },
-  { name: 'Bandung', province: 'Jawa Barat', x: 447, y: 453, surfers: 240 },
-  { name: 'Semarang', province: 'Jawa Tengah', x: 547, y: 455, surfers: 185 },
-  { name: 'Surabaya', province: 'Jawa Timur', x: 631, y: 470, surfers: 210 },
-  { name: 'Denpasar', province: 'Bali', x: 717, y: 515, surfers: 75 },
-  { name: 'Pontianak', province: 'Kalimantan Barat', x: 515, y: 265, surfers: 28 },
-  { name: 'Balikpapan', province: 'Kalimantan Timur', x: 773, y: 247, surfers: 42 },
-  { name: 'Makassar', province: 'Sulawesi Selatan', x: 868, y: 393, surfers: 38 },
-  { name: 'Manado', province: 'Sulawesi Utara', x: 1020, y: 140, surfers: 14 },
-  { name: 'Ambon', province: 'Maluku', x: 1179, y: 338, surfers: 7 },
-  { name: 'Sorong', province: 'Papua Barat Daya', x: 1289, y: 237, surfers: 8 },
-  { name: 'Manokwari', province: 'Papua Barat', x: 1363, y: 235, surfers: 6 },
-  { name: 'Timika', province: 'Papua Tengah', x: 1511, y: 357, surfers: 9 },
-  { name: 'Jayapura', province: 'Papua', x: 1598, y: 291, surfers: 12 },
-  { name: 'Merauke', province: 'Papua Selatan', x: 1558, y: 506, surfers: 7 },
+  { name: 'Medan', province: 'Sumatera Utara', x: 129, y: 81, surfers: 85 },
+  { name: 'Palembang', province: 'Sumatera Selatan', x: 344, y: 315, surfers: 45 },
+  { name: 'Jakarta (IDC)', province: 'DKI Jakarta', x: 419, y: 429, surfers: 520 },
+  { name: 'Bandung', province: 'Jawa Barat', x: 447, y: 455, surfers: 240 },
+  { name: 'Semarang', province: 'Jawa Tengah', x: 545, y: 459, surfers: 185 },
+  { name: 'Surabaya', province: 'Jawa Timur', x: 628, y: 468, surfers: 210 },
+  { name: 'Denpasar', province: 'Bali', x: 716, y: 517, surfers: 75 },
+  { name: 'Pontianak', province: 'Kalimantan Barat', x: 507, y: 210, surfers: 28 },
+  { name: 'Balikpapan', province: 'Kalimantan Timur', x: 774, y: 251, surfers: 42 },
+  { name: 'Makassar', province: 'Sulawesi Selatan', x: 867, y: 392, surfers: 38 },
+  { name: 'Manado', province: 'Sulawesi Utara', x: 1058, y: 156, surfers: 14 },
+  { name: 'Ambon', province: 'Maluku', x: 1176, y: 340, surfers: 7 },
+  { name: 'Sorong', province: 'Papua Barat Daya', x: 1288, y: 241, surfers: 8 },
+  { name: 'Manokwari', province: 'Papua Barat', x: 1374, y: 242, surfers: 6 },
+  { name: 'Timika', province: 'Papua Tengah', x: 1475, y: 368, surfers: 9 },
+  { name: 'Jayapura', province: 'Papua', x: 1622, y: 303, surfers: 12 },
+  { name: 'Merauke', province: 'Papua Selatan', x: 1601, y: 486, surfers: 7 },
 ];
 
 export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
@@ -577,6 +578,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
 
             containerSelection.selectAll<SVGTextElement, RadarNode>('.radar-city-label')
               .attr('font-size', `${10.5 / k}px`)
+              .attr('x', (d) => (d && d.x > 1590 ? -6 / k : 0))
               .attr('y', (d) => (d && d.y > 450 ? 14 / k : -8 / k));
           });
 
@@ -728,9 +730,9 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           nodeItem
             .append('text')
             .attr('class', 'radar-city-label')
-            .attr('x', 0)
+            .attr('x', node.x > 1590 ? -6 : 0)
             .attr('y', node.y > 450 ? 14 : -8)
-            .attr('text-anchor', 'middle')
+            .attr('text-anchor', node.x > 1590 ? 'end' : 'middle')
             .attr('fill', '#e2e8f0')
             .attr('font-size', '10.5')
             .attr('font-weight', '600')
