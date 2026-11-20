@@ -17,7 +17,8 @@ import {
   ShieldCheck,
   ShieldAlert,
   Ban,
-  Loader2
+  Loader2,
+  Pencil
 } from 'lucide-react';
 import { WebsiteCampaign, IndonesianRegionId, DeviceType, WebsiteCategory, UserProfile } from '../types';
 import { INDONESIAN_REGIONS } from '../data/mockData';
@@ -29,6 +30,7 @@ interface WebsitesManagerProps {
   user: UserProfile;
   websites: WebsiteCampaign[];
   onAddWebsite: (newSite: Omit<WebsiteCampaign, 'id' | 'createdAt' | 'hitsDeliveredToday' | 'totalHitsDelivered'>) => void;
+  onUpdateWebsite?: (siteId: string, updates: Partial<WebsiteCampaign>) => Promise<{ ok: boolean; error?: string }> | void;
   onToggleStatus: (siteId: string) => void;
   onDeleteWebsite: (siteId: string) => void;
   onAddPointsToSite: (siteId: string, amount: number) => void;
@@ -40,6 +42,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   user,
   websites,
   onAddWebsite,
+  onUpdateWebsite,
   onToggleStatus,
   onDeleteWebsite,
   onAddPointsToSite,
@@ -47,8 +50,10 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   onOpenAuditConsole,
 }) => {
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [editingSite, setEditingSite] = useState<WebsiteCampaign | null>(null);
   const [selectedSiteForPoints, setSelectedSiteForPoints] = useState<WebsiteCampaign | null>(null);
   const [pointsToAdd, setPointsToAdd] = useState<number>(100);
+  const [topupError, setTopupError] = useState<string>('');
 
   // Form State
   const [title, setTitle] = useState<string>('');
@@ -66,6 +71,51 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   const [detectedViolationKeywords, setDetectedViolationKeywords] = useState<string[]>([]);
   const [successMsg, setSuccessMsg] = useState<string>('');
 
+  const openCreateModal = () => {
+    setEditingSite(null);
+    setTitle('');
+    setUrl('https://');
+    setCategory('blog');
+    setDurationSec(30);
+    setTargetRegion('nasional');
+    setTargetDevice('all');
+    setDailyLimit(100);
+    setAllocatedPoints(Math.min(200, Math.max(50, user.points)));
+    setReferrerPolicy('direct');
+    setUtmEnabled(false);
+    setErrorMsg('');
+    setDetectedViolationKeywords([]);
+    setSuccessMsg('');
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (site: WebsiteCampaign) => {
+    setEditingSite(site);
+    setTitle(site.title);
+    setUrl(site.url);
+    setCategory(site.category);
+    setDurationSec(site.durationSec);
+    setTargetRegion(site.targetRegion);
+    setTargetDevice(site.targetDevice);
+    setDailyLimit(site.dailyHitLimit);
+    setAllocatedPoints(site.allocatedPoints);
+    setReferrerPolicy(site.referrerPolicy || 'direct');
+    setUtmEnabled(Boolean(site.utmEnabled));
+    setErrorMsg('');
+    setDetectedViolationKeywords([]);
+    setSuccessMsg('');
+    setIsModalOpen(true);
+  };
+
+  const closeFormModal = () => {
+    if (isProbing) return;
+    setIsModalOpen(false);
+    setEditingSite(null);
+    setErrorMsg('');
+    setDetectedViolationKeywords([]);
+    setSuccessMsg('');
+  };
+
   const calculateCostPerHit = (sec: number) => {
     switch (sec) {
       case 15:
@@ -81,43 +131,51 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
     }
   };
 
-  const handleCreateSubmit = async (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setDetectedViolationKeywords([]);
 
-    if (!title.trim()) {
+    const trimmedTitle = title.trim();
+    const trimmedUrl = url.trim();
+
+    if (!trimmedTitle) {
       setErrorMsg('Judul website wajib diisi.');
       return;
     }
 
-    if (!url.startsWith('http://') && !url.startsWith('https://')) {
+    if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
       setErrorMsg('URL harus diawali dengan http:// atau https://');
       return;
     }
 
     // 1. Instant client-side Heuristic Compliance Audit (Anti-Judi Online & Anti-18+)
-    let auditResult = auditWebsiteCompliance(url, title);
+    let auditResult = auditWebsiteCompliance(trimmedUrl, trimmedTitle);
     if (!auditResult.passed) {
       setErrorMsg(auditResult.reason);
       setDetectedViolationKeywords(auditResult.detectedKeywords);
       return;
     }
 
-    if (allocatedPoints > user.points) {
+    if (!editingSite && allocatedPoints > user.points) {
       setErrorMsg(`Saldo poin Anda tidak cukup (${user.points} Poin tersedia). Beli poin atau kurangi alokasi awal.`);
       return;
     }
 
+    const cost = calculateCostPerHit(durationSec);
+    const shouldProbe =
+      wpAuthService.isLiveBridgeActive() &&
+      (!editingSite || trimmedUrl !== editingSite.url || trimmedTitle !== editingSite.title);
+
     // 2. Live WordPress Server Probe (wp_remote_get HTML scan + X-Frame-Options header check)
-    let iframeAllowed = true;
-    let auditNotes = auditResult.reason;
+    let iframeAllowed = editingSite ? editingSite.iframeAllowed !== false : true;
+    let auditNotes = editingSite ? editingSite.auditNotes || auditResult.reason : auditResult.reason;
     let fetchedTitle = '';
     let fetchedDescription = '';
 
-    if (wpAuthService.isLiveBridgeActive()) {
+    if (shouldProbe) {
       setIsProbing(true);
-      const probe = await wpAuthService.probeWebsite(url, title);
+      const probe = await wpAuthService.probeWebsite(trimmedUrl, trimmedTitle);
       setIsProbing(false);
 
       if (probe) {
@@ -134,11 +192,56 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       }
     }
 
-    const cost = calculateCostPerHit(durationSec);
+    if (editingSite && onUpdateWebsite) {
+      setIsProbing(true);
+      const updateResult = await onUpdateWebsite(editingSite.id, {
+        title: trimmedTitle,
+        url: trimmedUrl,
+        category,
+        durationSec,
+        targetRegion,
+        targetDevice,
+        pointsCostPerVisit: cost,
+        dailyHitLimit: dailyLimit,
+        iframeAllowed,
+        referrerPolicy,
+        utmEnabled,
+        auditStatus: 'approved',
+        auditScore: auditResult.riskScore,
+        auditNotes,
+        previewContent: {
+          headline: fetchedTitle || trimmedTitle,
+          description:
+            fetchedDescription ||
+            editingSite.previewContent?.description ||
+            `Website terdaftar di ${APP_CONFIG.fullName} kategori ${category.toUpperCase()} dengan target wilayah ${targetRegion.toUpperCase()}.`,
+          author: editingSite.previewContent?.author || user.name,
+          city: targetRegion === 'nasional' ? 'Seluruh Nusantara' : targetRegion,
+          tags: [category, `${APP_NAME} Indonesia`, 'Web Nusantara'],
+          bodySnippet:
+            editingSite.previewContent?.bodySnippet ||
+            'Konten terverifikasi dan siap ditayangkan kepada ribuan peselancar aktif di seluruh Indonesia melalui jaringan pertukaran trafik aman anti-cheat.',
+        },
+      });
+      setIsProbing(false);
+
+      if (updateResult && !updateResult.ok) {
+        setErrorMsg(updateResult.error || 'Gagal menyimpan perubahan website.');
+        return;
+      }
+
+      setSuccessMsg('Perubahan pengaturan website berhasil disimpan & langsung aktif di rotasi!');
+      setTimeout(() => {
+        setIsModalOpen(false);
+        setEditingSite(null);
+        setSuccessMsg('');
+      }, 1100);
+      return;
+    }
 
     onAddWebsite({
-      title,
-      url,
+      title: trimmedTitle,
+      url: trimmedUrl,
       category,
       durationSec,
       targetRegion,
@@ -155,7 +258,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       reportedCount: 0,
       auditNotes,
       previewContent: {
-        headline: fetchedTitle || title,
+        headline: fetchedTitle || trimmedTitle,
         description:
           fetchedDescription ||
           `Website terdaftar di ${APP_CONFIG.fullName} kategori ${category.toUpperCase()} dengan target wilayah ${targetRegion.toUpperCase()}.`,
@@ -184,10 +287,11 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
     if (!selectedSiteForPoints) return;
 
     if (pointsToAdd > user.points) {
-      alert(`Saldo tidak cukup! Anda hanya memiliki ${user.points} Poin.`);
+      setTopupError(`Saldo tidak cukup! Anda hanya memiliki ${user.points.toLocaleString('id-ID')} Poin.`);
       return;
     }
 
+    setTopupError('');
     onAddPointsToSite(selectedSiteForPoints.id, pointsToAdd);
     setSelectedSiteForPoints(null);
   };
@@ -217,7 +321,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
           )}
 
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm"
           >
             <Plus className="w-4 h-4" />
@@ -237,7 +341,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
             Tambahkan URL blog, landing page, atau toko online Anda untuk mulai menerima kunjungan organik nusantara.
           </p>
           <button
-            onClick={() => setIsModalOpen(true)}
+            onClick={openCreateModal}
             className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold cursor-pointer"
           >
             Tambah Website Pertama
@@ -367,7 +471,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
 
                 {/* Card Actions */}
                 <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       onClick={() => onToggleStatus(site.id)}
                       className="px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1 cursor-pointer transition-colors"
@@ -376,8 +480,22 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                       <span>{isPaused ? 'Aktifkan' : 'Jeda'}</span>
                     </button>
 
+                    {onUpdateWebsite && (
+                      <button
+                        onClick={() => openEditModal(site)}
+                        className="px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1 cursor-pointer transition-colors"
+                        title="Edit judul, URL, durasi, target, atau pengaturan GA4"
+                      >
+                        <Pencil className="w-3 h-3 text-cyan-400" />
+                        <span>Edit</span>
+                      </button>
+                    )}
+
                     <button
-                      onClick={() => setSelectedSiteForPoints(site)}
+                      onClick={() => {
+                        setTopupError('');
+                        setSelectedSiteForPoints(site);
+                      }}
                       className="px-2.5 py-1.5 rounded-lg border border-slate-800 bg-slate-800/80 hover:bg-slate-700 text-xs font-medium text-slate-200 flex items-center gap-1 cursor-pointer transition-colors"
                     >
                       <Plus className="w-3 h-3 text-emerald-400" />
@@ -399,15 +517,17 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
         </div>
       )}
 
-      {/* Add Website Modal */}
+      {/* Add / Edit Website Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm overflow-y-auto">
           <div className="relative w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 p-6 shadow-2xl my-8">
             <h3 className="text-base font-bold text-slate-100">
-              Daftarkan Website Baru
+              {editingSite ? 'Edit Pengaturan Website' : 'Daftarkan Website Baru'}
             </h3>
             <p className="text-xs text-slate-400 mt-0.5">
-              Situs akan langsung masuk ke rotasi penukaran trafik peselancar Indonesia.
+              {editingSite
+                ? 'Ubah judul, URL target, durasi, wilayah, perangkat, batas harian, atau pelacakan GA4 tanpa kehilangan statistik kunjungan.'
+                : 'Situs akan langsung masuk ke rotasi penukaran trafik peselancar Indonesia.'}
             </p>
 
             {/* Compliance Policy Notice */}
@@ -419,12 +539,12 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
               </div>
             </div>
 
-            <form onSubmit={handleCreateSubmit} className="mt-4 space-y-4">
+            <form onSubmit={handleFormSubmit} className="mt-4 space-y-4">
               {errorMsg && (
                 <div className="p-3.5 rounded-lg bg-rose-950/70 border border-rose-800 text-rose-200 text-xs space-y-2">
                   <div className="flex items-center gap-2 font-semibold text-rose-300">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
-                    <span>Pendaftaran Ditolak: Pelanggaran Kepatuhan</span>
+                    <span>{editingSite ? 'Perubahan Ditolak' : 'Pendaftaran Ditolak: Pelanggaran Kepatuhan'}</span>
                   </div>
                   <p className="text-xs leading-relaxed text-rose-200">{errorMsg}</p>
                   {detectedViolationKeywords.length > 0 && (
@@ -567,36 +687,55 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                 </div>
               </div>
 
-              {/* Initial Point Allocation */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-medium text-slate-300">
-                    Alokasikan Poin Awal untuk Situs Ini
-                  </label>
-                  <span className="text-xs text-slate-400">
-                    Saldo Anda:{' '}
-                    <strong className="text-emerald-400 font-mono tabular-nums">
-                      {user.points.toLocaleString('id-ID')}
+              {/* Initial Point Allocation (Create) or Existing Point Summary (Edit) */}
+              {editingSite ? (
+                <div className="p-3 rounded-lg bg-slate-950/80 border border-slate-800 flex items-center justify-between text-xs">
+                  <div>
+                    <span className="text-slate-400 block">Sisa Poin Situs Saat Ini</span>
+                    <span className="text-[11px] text-slate-500">
+                      Gunakan tombol <strong className="text-slate-300">Tambah Poin</strong> di kartu untuk menambah saldo situs.
+                    </span>
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <span className="font-mono font-bold text-emerald-400 tabular-nums block">
+                      {editingSite.allocatedPoints.toLocaleString('id-ID')} Poin
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-mono tabular-nums">
+                      ~{Math.floor(editingSite.allocatedPoints / calculateCostPerHit(durationSec))} kunjungan
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-slate-300">
+                      Alokasikan Poin Awal untuk Situs Ini
+                    </label>
+                    <span className="text-xs text-slate-400">
+                      Saldo Anda:{' '}
+                      <strong className="text-emerald-400 font-mono tabular-nums">
+                        {user.points.toLocaleString('id-ID')}
+                      </strong>{' '}
+                      Poin
+                    </span>
+                  </div>
+                  <input
+                    type="number"
+                    min={50}
+                    max={user.points}
+                    value={allocatedPoints}
+                    onChange={(e) => setAllocatedPoints(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                  />
+                  <span className="text-[11px] text-slate-500 mt-1 block">
+                    ~Estimasi Kunjungan:{' '}
+                    <strong className="text-slate-300 font-mono tabular-nums">
+                      {Math.floor(allocatedPoints / calculateCostPerHit(durationSec))}
                     </strong>{' '}
-                    Poin
+                    pengunjung Indonesia asli.
                   </span>
                 </div>
-                <input
-                  type="number"
-                  min={50}
-                  max={user.points}
-                  value={allocatedPoints}
-                  onChange={(e) => setAllocatedPoints(Number(e.target.value))}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
-                />
-                <span className="text-[11px] text-slate-500 mt-1 block">
-                  ~Estimasi Kunjungan:{' '}
-                  <strong className="text-slate-300 font-mono tabular-nums">
-                    {Math.floor(allocatedPoints / calculateCostPerHit(durationSec))}
-                  </strong>{' '}
-                  pengunjung Indonesia asli.
-                </span>
-              </div>
+              )}
 
               {/* Google Analytics Referrer Policy */}
               <div>
@@ -632,7 +771,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
               <div className="pt-3 border-t border-slate-800 flex items-center justify-end gap-2">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={closeFormModal}
                   disabled={isProbing}
                   className="px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
                 >
@@ -644,7 +783,13 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                   className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm inline-flex items-center gap-1.5"
                 >
                   {isProbing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  <span>{isProbing ? 'Memindai HTML & Header Situs...' : 'Simpan & Luncurkan'}</span>
+                  <span>
+                    {isProbing
+                      ? 'Memindai & Menyimpan...'
+                      : editingSite
+                      ? 'Simpan Perubahan'
+                      : 'Simpan & Luncurkan'}
+                  </span>
                 </button>
               </div>
             </form>
@@ -664,6 +809,12 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
             </p>
 
             <form onSubmit={handleTopupPoints} className="mt-4 space-y-3">
+              {topupError && (
+                <div className="p-2.5 rounded-lg bg-rose-950/70 border border-rose-800 text-rose-200 text-xs">
+                  {topupError}
+                </div>
+              )}
+
               <div>
                 <div className="flex items-center justify-between text-xs text-slate-400 mb-1">
                   <span>Poin yang Ditambahkan</span>
@@ -687,7 +838,10 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setSelectedSiteForPoints(null)}
+                  onClick={() => {
+                    setTopupError('');
+                    setSelectedSiteForPoints(null);
+                  }}
                   className="px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200 cursor-pointer"
                 >
                   Batal

@@ -1297,6 +1297,72 @@ add_action('rest_api_init', function () {
                             'audit_notes'  => sanitize_textarea_field($params['reason'] ?? 'Dikarantina oleh Administrator.'),
                         ], ['id' => $site_id]);
                     }
+                } elseif ($action === 'update_details') {
+                    if (!$is_owner) {
+                        return new WP_Error('forbidden', 'Tidak memiliki izin mengedit website ini.', ['status' => 403]);
+                    }
+
+                    $new_title = sanitize_text_field($params['title'] ?? $row->title);
+                    $new_url   = esc_url_raw($params['url'] ?? $row->url);
+
+                    if (empty($new_title)) {
+                        return new WP_Error('invalid_title', 'Judul website wajib diisi.', ['status' => 400]);
+                    }
+                    if (empty($new_url) || !preg_match('/^https?:\/\//i', $new_url)) {
+                        return new WP_Error('invalid_url', 'URL website tidak valid.', ['status' => 400]);
+                    }
+
+                    $new_duration = max(10, intval($params['durationSec'] ?? $row->duration_sec));
+                    $cost_map     = [15 => 0.6, 30 => 1.0, 45 => 1.4, 60 => 1.8];
+                    $new_cost     = isset($cost_map[$new_duration]) ? $cost_map[$new_duration] : max(0.5, floatval($params['pointsCostPerVisit'] ?? $row->points_cost_per_visit));
+
+                    $update_data = [
+                        'title'                 => $new_title,
+                        'url'                   => $new_url,
+                        'category'              => sanitize_text_field($params['category'] ?? $row->category),
+                        'duration_sec'          => $new_duration,
+                        'target_region'         => sanitize_text_field($params['targetRegion'] ?? $row->target_region),
+                        'target_device'         => sanitize_text_field($params['targetDevice'] ?? $row->target_device),
+                        'points_cost_per_visit' => $new_cost,
+                        'daily_hit_limit'       => max(10, intval($params['dailyHitLimit'] ?? $row->daily_hit_limit)),
+                        'referrer_policy'       => (($params['referrerPolicy'] ?? $row->referrer_policy) === 'referral') ? 'referral' : 'direct',
+                        'utm_enabled'           => isset($params['utmEnabled']) ? (!empty($params['utmEnabled']) ? 1 : 0) : (int) $row->utm_enabled,
+                    ];
+
+                    // Re-run server-side live HTML compliance audit & X-Frame-Options check whenever URL or Title changes
+                    if ($new_url !== $row->url || $new_title !== $row->title) {
+                        $probe = trafik_bridge_probe_website($new_url, $new_title);
+                        if (empty($probe['compliance']['passed'])) {
+                            return new WP_Error(
+                                'compliance_rejected',
+                                $probe['compliance']['reason'],
+                                [
+                                    'status'           => 422,
+                                    'detectedKeywords' => $probe['compliance']['detectedKeywords'],
+                                    'riskScore'        => $probe['compliance']['riskScore'],
+                                ]
+                            );
+                        }
+
+                        $update_data['iframe_allowed']    = !empty($probe['iframeAllowed']) ? 1 : 0;
+                        $update_data['audit_status']      = 'approved';
+                        $update_data['audit_score']       = (int) ($probe['compliance']['riskScore'] ?? 0);
+                        $update_data['audit_violations']  = wp_json_encode($probe['compliance']['violations'] ?? []);
+                        $update_data['detected_keywords'] = wp_json_encode($probe['compliance']['detectedKeywords'] ?? []);
+                        $update_data['audit_notes']       = sanitize_textarea_field($probe['compliance']['reason'] . ' ' . $probe['frameReason']);
+
+                        $existing_preview = !empty($row->preview_content) ? json_decode($row->preview_content, true) : [];
+                        if (!is_array($existing_preview)) {
+                            $existing_preview = [];
+                        }
+                        $existing_preview['headline'] = !empty($probe['fetchedTitle']) ? $probe['fetchedTitle'] : $new_title;
+                        if (!empty($probe['fetchedDescription'])) {
+                            $existing_preview['description'] = $probe['fetchedDescription'];
+                        }
+                        $update_data['preview_content'] = wp_json_encode($existing_preview);
+                    }
+
+                    $wpdb->update($table, $update_data, ['id' => $site_id]);
                 }
 
                 $fresh = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %s", $site_id));

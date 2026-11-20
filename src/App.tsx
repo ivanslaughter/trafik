@@ -543,6 +543,47 @@ export default function App() {
     }
   };
 
+  const handleUpdateWebsite = async (
+    siteId: string,
+    updates: Partial<WebsiteCampaign>
+  ): Promise<{ ok: boolean; error?: string }> => {
+    const previousSite = userWebsites.find((s) => s.id === siteId);
+    if (!previousSite) {
+      return { ok: false, error: 'Website tidak ditemukan.' };
+    }
+
+    const updatedSite: WebsiteCampaign = {
+      ...previousSite,
+      ...updates,
+      id: previousSite.id,
+      createdAt: previousSite.createdAt,
+      hitsDeliveredToday: previousSite.hitsDeliveredToday,
+      totalHitsDelivered: previousSite.totalHitsDelivered,
+      allocatedPoints: previousSite.allocatedPoints,
+    };
+
+    setUserWebsites((prev) => prev.map((s) => (s.id === siteId ? updatedSite : s)));
+    setCommunityWebsites((prev) => prev.map((s) => (s.id === siteId ? updatedSite : s)));
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      const res = await wpAuthService.updateWebsiteDetails(siteId, updates);
+      if (res?.website) {
+        const syncedSite = res.website;
+        setUserWebsites((prev) => prev.map((s) => (s.id === siteId ? syncedSite : s)));
+        setCommunityWebsites((prev) => prev.map((s) => (s.id === siteId ? syncedSite : s)));
+        if (res.user) setUser(res.user);
+        return { ok: true };
+      }
+      if (res?.error) {
+        setUserWebsites((prev) => prev.map((s) => (s.id === siteId ? previousSite : s)));
+        setCommunityWebsites((prev) => prev.map((s) => (s.id === siteId ? previousSite : s)));
+        return { ok: false, error: res.error };
+      }
+    }
+
+    return { ok: true };
+  };
+
   const handleToggleWebsiteStatus = (siteId: string) => {
     setUserWebsites((prev) =>
       prev.map((s) => {
@@ -925,6 +966,7 @@ export default function App() {
               user={user}
               websites={userWebsites}
               onAddWebsite={handleAddWebsite}
+              onUpdateWebsite={handleUpdateWebsite}
               onToggleStatus={handleToggleWebsiteStatus}
               onDeleteWebsite={handleDeleteWebsite}
               onAddPointsToSite={handleAddPointsToSite}

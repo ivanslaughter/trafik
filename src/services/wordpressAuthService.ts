@@ -474,6 +474,27 @@ class WordPressAuthService {
     return res.ok && res.data ? res.data : null;
   }
 
+  public async updateWebsiteDetails(
+    siteId: string,
+    updates: Partial<WebsiteCampaign>
+  ): Promise<{ website?: WebsiteCampaign; user?: UserProfile; error?: string } | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const res = await this.request<{ website: WebsiteCampaign; user: UserProfile }>(
+      `/websites/${encodeURIComponent(siteId)}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          action: 'update_details',
+          ...updates,
+        }),
+      }
+    );
+    if (!res.ok) {
+      return { error: res.error || 'Gagal menyimpan perubahan website di server WordPress.' };
+    }
+    return res.data ? res.data : null;
+  }
+
   public async deleteWebsite(siteId: string): Promise<{ deleted: boolean; user: UserProfile } | null> {
     if (!this.isLiveBridgeActive()) return null;
     const res = await this.request<{ deleted: boolean; user: UserProfile }>(
