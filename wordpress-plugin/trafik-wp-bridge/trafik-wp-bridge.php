@@ -3,7 +3,7 @@
  * Plugin Name: Trafik WP Bridge
  * Plugin URI: https://trafik.velocity.web.id
  * Description: Menjembatani aplikasi Trafik (React SPA) dengan database MySQL/MariaDB & autentikasi pengguna WordPress via REST API (/wp-json/trafik/v1).
- * Version: 1.4.0
+ * Version: 1.5.0
  * Author: Velocity Digital
  * Author URI: https://velocity.web.id
  * License: GPLv2 or later
@@ -14,8 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TRAFIK_BRIDGE_VERSION', '1.4.0');
-define('TRAFIK_BRIDGE_DB_VERSION', '1.4.0');
+define('TRAFIK_BRIDGE_VERSION', '1.5.0');
+define('TRAFIK_BRIDGE_DB_VERSION', '1.5.0');
 
 /**
  * 1. ACTIVATION & DATABASE SCHEMA (MySQL / MariaDB)
@@ -28,6 +28,7 @@ function trafik_bridge_install() {
     $table_campaigns = $wpdb->prefix . 'trafik_campaigns';
     $table_logs      = $wpdb->prefix . 'trafik_anticheat_logs';
     $table_events    = $wpdb->prefix . 'trafik_surf_events';
+    $table_daily     = $wpdb->prefix . 'trafik_daily_stats';
 
     $sql_campaigns = "CREATE TABLE {$table_campaigns} (
         id varchar(64) NOT NULL,
@@ -87,9 +88,22 @@ function trafik_bridge_install() {
         KEY idx_user_created (user_id, created_at)
     ) {$charset_collate};";
 
+    $sql_daily = "CREATE TABLE {$table_daily} (
+        user_id bigint(20) unsigned NOT NULL,
+        stat_date date NOT NULL,
+        points_earned decimal(12,2) NOT NULL DEFAULT 0.00,
+        traffic_delivered int(11) NOT NULL DEFAULT 0,
+        points_spent decimal(12,2) NOT NULL DEFAULT 0.00,
+        surfs_completed int(11) NOT NULL DEFAULT 0,
+        updated_at datetime NOT NULL,
+        PRIMARY KEY  (user_id, stat_date),
+        KEY idx_stat_date (stat_date)
+    ) {$charset_collate};";
+
     dbDelta($sql_campaigns);
     dbDelta($sql_logs);
     dbDelta($sql_events);
+    dbDelta($sql_daily);
 
     update_option('trafik_bridge_db_version', TRAFIK_BRIDGE_DB_VERSION);
 
@@ -110,6 +124,43 @@ add_action('plugins_loaded', function () {
         trafik_bridge_install();
     }
 });
+
+/**
+ * Atomic O(1) Daily Rollup Upsert for High-Concurrency 7-Day Trend Analytics
+ * Uses Clustered Primary Key (user_id, stat_date) so reading 7 days scans at most 7 rows (~0.1ms).
+ */
+function trafik_bridge_record_daily_stat($user_id, $points_earned = 0.0, $traffic_delivered = 0, $points_spent = 0.0, $surfs_completed = 0) {
+    global $wpdb;
+    $uid = (int) $user_id;
+    if ($uid <= 0) {
+        return;
+    }
+
+    $table_daily = $wpdb->prefix . 'trafik_daily_stats';
+    $today_date  = current_time('Y-m-d');
+    $now_mysql   = current_time('mysql');
+
+    $wpdb->query($wpdb->prepare(
+        "INSERT INTO {$table_daily}
+            (user_id, stat_date, points_earned, traffic_delivered, points_spent, surfs_completed, updated_at)
+         VALUES (%d, %s, %f, %d, %f, %d, %s)
+         ON DUPLICATE KEY UPDATE
+            points_earned = ROUND(points_earned + VALUES(points_earned), 2),
+            traffic_delivered = traffic_delivered + VALUES(traffic_delivered),
+            points_spent = ROUND(points_spent + VALUES(points_spent), 2),
+            surfs_completed = surfs_completed + VALUES(surfs_completed),
+            updated_at = VALUES(updated_at)",
+        $uid,
+        $today_date,
+        round((float) $points_earned, 2),
+        (int) $traffic_delivered,
+        round((float) $points_spent, 2),
+        (int) $surfs_completed,
+        $now_mysql
+    ));
+
+    delete_transient('trafik_wtrend_' . $uid);
+}
 
 /**
  * 2. CORS HEADERS FOR CROSS-SUBDOMAIN ACCESS (trafik.velocity.web.id -> velocity.web.id)
@@ -1264,7 +1315,7 @@ add_action('rest_api_init', function () {
             $payload = [
                 'source'          => 'mysql_live',
                 'updatedAt'       => gmdate('c'),
-                'pollIntervalSec' => 20,
+                'pollIntervalSec' => 30,
                 'totalSurfers'    => $total_surfers,
                 'totalHits24h'    => $total_hits,
                 'activeCampaigns' => $active_campaigns,
@@ -1273,7 +1324,173 @@ add_action('rest_api_init', function () {
                 'provinces'       => $provinces,
             ];
 
-            set_transient($cache_key, $payload, 10);
+            set_transient($cache_key, $payload, 15);
+            return rest_ensure_response($payload);
+        },
+    ]);
+
+    // Real-Time 7-Day User Trend from O(1) Pre-Aggregated Daily Rollup Table (GET /user/weekly-trend)
+    register_rest_route($ns, '/user/weekly-trend', [
+        'methods'             => 'GET',
+        'permission_callback' => 'trafik_bridge_permission_user',
+        'callback'            => function (WP_REST_Request $request) {
+            global $wpdb;
+
+            $user = trafik_bridge_get_current_user($request);
+            $uid  = (int) $user->ID;
+            $fresh = $request->get_param('fresh') === '1';
+
+            $cache_key = 'trafik_wtrend_' . $uid;
+            if (!$fresh) {
+                $cached = get_transient($cache_key);
+                if (is_array($cached)) {
+                    return rest_ensure_response($cached);
+                }
+            }
+
+            $table_daily     = $wpdb->prefix . 'trafik_daily_stats';
+            $table_events    = $wpdb->prefix . 'trafik_surf_events';
+            $table_campaigns = $wpdb->prefix . 'trafik_campaigns';
+
+            $now_ts     = (int) current_time('timestamp');
+            $start_date = gmdate('Y-m-d', $now_ts - (6 * DAY_IN_SECONDS));
+
+            // O(1) Clustered Primary Key range lookup: scans at most 7 rows for this user
+            $rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT stat_date, points_earned, traffic_delivered, points_spent, surfs_completed
+                 FROM {$table_daily}
+                 WHERE user_id = %d AND stat_date >= %s
+                 ORDER BY stat_date ASC",
+                $uid,
+                $start_date
+            ));
+
+            $by_date = [];
+            if (is_array($rows)) {
+                foreach ($rows as $r) {
+                    $by_date[(string) $r->stat_date] = [
+                        'pointsEarned'     => round((float) $r->points_earned, 2),
+                        'trafficDelivered' => (int) $r->traffic_delivered,
+                        'pointsSpent'      => round((float) $r->points_spent, 2),
+                        'surfsCompleted'   => (int) $r->surfs_completed,
+                    ];
+                }
+            }
+
+            // One-time seamless backfill from last 7 days of wp_trafik_surf_events if upgrading from v1.4.0
+            if (empty($by_date)) {
+                $backfill_flag = 'tn_daily_backfilled_v15';
+                if (!get_user_meta($uid, $backfill_flag, true)) {
+                    $events_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_events)) === $table_events;
+                    if ($events_exists) {
+                        $surf_ratio = floatval(get_user_meta($uid, 'tn_surf_ratio', true) ?: 0.7);
+                        $start_dt   = $start_date . ' 00:00:00';
+                        $now_mysql  = current_time('mysql');
+
+                        // 1) Surfs performed by this user
+                        $surf_hist = $wpdb->get_results($wpdb->prepare(
+                            "SELECT DATE(created_at) AS d, COUNT(*) AS cnt
+                             FROM {$table_events}
+                             WHERE user_id = %d AND created_at >= %s
+                             GROUP BY DATE(created_at)",
+                            $uid,
+                            $start_dt
+                        ));
+                        if (is_array($surf_hist)) {
+                            foreach ($surf_hist as $sh) {
+                                $d_key = (string) $sh->d;
+                                $cnt   = (int) $sh->cnt;
+                                $pts   = round($cnt * $surf_ratio, 2);
+                                if (!isset($by_date[$d_key])) {
+                                    $by_date[$d_key] = ['pointsEarned' => 0.0, 'trafficDelivered' => 0, 'pointsSpent' => 0.0, 'surfsCompleted' => 0];
+                                }
+                                $by_date[$d_key]['pointsEarned']   += $pts;
+                                $by_date[$d_key]['surfsCompleted'] += $cnt;
+                            }
+                        }
+
+                        // 2) Hits received on campaigns owned by this user
+                        $recv_hist = $wpdb->get_results($wpdb->prepare(
+                            "SELECT DATE(e.created_at) AS d, COUNT(*) AS hits, SUM(c.points_cost_per_visit) AS spent
+                             FROM {$table_events} e
+                             INNER JOIN {$table_campaigns} c ON c.id = e.campaign_id
+                             WHERE c.submitted_by_user_id = %d AND e.created_at >= %s
+                             GROUP BY DATE(e.created_at)",
+                            $uid,
+                            $start_dt
+                        ));
+                        if (is_array($recv_hist)) {
+                            foreach ($recv_hist as $rh) {
+                                $d_key = (string) $rh->d;
+                                if (!isset($by_date[$d_key])) {
+                                    $by_date[$d_key] = ['pointsEarned' => 0.0, 'trafficDelivered' => 0, 'pointsSpent' => 0.0, 'surfsCompleted' => 0];
+                                }
+                                $by_date[$d_key]['trafficDelivered'] += (int) $rh->hits;
+                                $by_date[$d_key]['pointsSpent']      += round((float) $rh->spent, 2);
+                            }
+                        }
+
+                        // Persist backfilled rows so future reads remain O(1)
+                        foreach ($by_date as $d_key => $vals) {
+                            $wpdb->query($wpdb->prepare(
+                                "INSERT IGNORE INTO {$table_daily}
+                                    (user_id, stat_date, points_earned, traffic_delivered, points_spent, surfs_completed, updated_at)
+                                 VALUES (%d, %s, %f, %d, %f, %d, %s)",
+                                $uid,
+                                $d_key,
+                                $vals['pointsEarned'],
+                                $vals['trafficDelivered'],
+                                $vals['pointsSpent'],
+                                $vals['surfsCompleted'],
+                                $now_mysql
+                            ));
+                        }
+                    }
+                    update_user_meta($uid, $backfill_flag, '1');
+                }
+            }
+
+            $day_names      = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
+            $full_day_names = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+            $month_names    = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+
+            $days = [];
+            for ($i = 6; $i >= 0; $i--) {
+                $ts        = $now_ts - ($i * DAY_IN_SECONDS);
+                $iso_date  = gmdate('Y-m-d', $ts);
+                $day_idx   = (int) gmdate('w', $ts);
+                $day_num   = (int) gmdate('j', $ts);
+                $month_idx = (int) gmdate('n', $ts) - 1;
+                $year_num  = (int) gmdate('Y', $ts);
+                $is_today  = ($i === 0);
+
+                $entry = $by_date[$iso_date] ?? [
+                    'pointsEarned'     => 0,
+                    'trafficDelivered' => 0,
+                    'pointsSpent'      => 0,
+                    'surfsCompleted'   => 0,
+                ];
+
+                $days[] = [
+                    'isoDate'          => $iso_date,
+                    'date'             => $is_today ? 'Hari Ini' : ($day_num . ' ' . $month_names[$month_idx]),
+                    'dayLabel'         => $is_today ? 'Hari Ini' : ($day_names[$day_idx] . ', ' . $day_num . ' ' . $month_names[$month_idx]),
+                    'fullDate'         => $full_day_names[$day_idx] . ', ' . $day_num . ' ' . $month_names[$month_idx] . ' ' . $year_num,
+                    'isToday'          => $is_today,
+                    'pointsEarned'     => round((float) $entry['pointsEarned'], 1),
+                    'trafficDelivered' => (int) $entry['trafficDelivered'],
+                    'pointsSpent'      => round((float) $entry['pointsSpent'], 1),
+                    'surfsCompleted'   => (int) $entry['surfsCompleted'],
+                ];
+            }
+
+            $payload = [
+                'source'    => 'mysql_live',
+                'updatedAt' => gmdate('c'),
+                'days'      => $days,
+            ];
+
+            set_transient($cache_key, $payload, 15);
             return rest_ensure_response($payload);
         },
     ]);
@@ -1331,7 +1548,11 @@ add_action('rest_api_init', function () {
                 'duration_sec' => $duration_sec,
                 'created_at'   => current_time('mysql'),
             ]);
-            delete_transient('trafik_network_stats_cache');
+            // Note: Do NOT delete global network_stats transient on every surf to avoid cache stampede
+            // under 1,000+ concurrent users (15s TTL refreshes automatically with O(1) DB pressure).
+
+            // Atomic O(1) daily rollup write-through for surfer's 7-day trend chart
+            trafik_bridge_record_daily_stat($uid, $earned, 0, 0.0, 1);
 
             // Deduct campaign points in MySQL
             $updated_campaign = null;
@@ -1357,6 +1578,9 @@ add_action('rest_api_init', function () {
                         $owner_id  = (int) $row->submitted_by_user_id;
                         $owner_rec = intval(get_user_meta($owner_id, 'tn_total_hits_received', true));
                         update_user_meta($owner_id, 'tn_total_hits_received', $owner_rec + 1);
+
+                        // Atomic O(1) daily rollup write-through for campaign owner's 7-day trend chart
+                        trafik_bridge_record_daily_stat($owner_id, 0.0, 1, $cost, 0);
                     }
 
                     $fresh_row = $wpdb->get_row($wpdb->prepare("SELECT * FROM {$table} WHERE id = %s", $site_id));

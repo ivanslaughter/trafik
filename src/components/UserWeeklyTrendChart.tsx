@@ -9,13 +9,18 @@ import {
   Tooltip,
   Legend,
 } from 'recharts';
-import { TrendingUp, Sparkles, Globe2, ArrowUpRight, Calendar, Info } from 'lucide-react';
+import { TrendingUp, Sparkles, Globe2, ArrowUpRight, Calendar, Info, RefreshCw } from 'lucide-react';
 import { UserProfile, WebsiteCampaign } from '../types';
-import { VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
+import { WeeklyTrendResponse } from '../services/wordpressAuthService';
+import { VwsGridFrame, VwsRowDivider, VwsColumnDivider, VwsTopLine } from './VwsSmartLine';
 
 interface UserWeeklyTrendChartProps {
   user: UserProfile;
   websites: WebsiteCampaign[];
+  liveTrend?: WeeklyTrendResponse | null;
+  isRefreshingLive?: boolean;
+  lastSyncedTime?: string;
+  onManualRefresh?: () => void;
 }
 
 interface TrendDataPoint {
@@ -30,11 +35,27 @@ interface TrendDataPoint {
 export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
   user,
   websites,
+  liveTrend = null,
+  isRefreshingLive = false,
+  lastSyncedTime = '',
+  onManualRefresh,
 }) => {
   const [activeMetric, setActiveMetric] = useState<'both' | 'points' | 'traffic'>('both');
+  const isLiveMysql = Boolean(liveTrend && liveTrend.source === 'mysql_live' && liveTrend.days.length > 0);
 
-  // Calculate 7-day trend based on user profile and current session stats
+  // Use 100% real-time MySQL O(1) daily rollup when connected; demo estimate only in simulated preview
   const chartData: TrendDataPoint[] = useMemo(() => {
+    if (isLiveMysql && liveTrend) {
+      return liveTrend.days.map((d) => ({
+        date: d.date,
+        dayLabel: d.dayLabel,
+        fullDate: d.fullDate,
+        pointsEarned: Number(d.pointsEarned) || 0,
+        trafficDelivered: Number(d.trafficDelivered) || 0,
+        pointsSpent: Number(d.pointsSpent) || 0,
+      }));
+    }
+
     const days: TrendDataPoint[] = [];
     const dayNames = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'];
     const fullDayNames = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
@@ -43,11 +64,9 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
     const todayHits = websites.reduce((acc, curr) => acc + curr.hitsDeliveredToday, 0);
     const todayPoints = Math.round(user.dailySurfedSeconds / 15) + (user.streakDays > 0 ? 30 : 0);
 
-    // Factors derived from user's level to generate realistic 7-day history
+    // Demo-only fallback factors when running without live WordPress Bridge
     const basePoints = Math.max(40, Math.round(user.points / 14));
     const baseHits = Math.max(20, Math.round(user.totalHitsReceived / 14));
-
-    // Daily variance pattern for a realistic organic curve
     const varianceMultipliers = [0.72, 0.88, 1.15, 0.94, 1.25, 1.38, 1.0];
 
     for (let i = 6; i >= 0; i--) {
@@ -56,7 +75,6 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
 
       const dayIdx = d.getDay();
       const isToday = i === 0;
-
       const multiplier = varianceMultipliers[6 - i];
 
       const pointsEarned = isToday
@@ -68,7 +86,6 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
         : Math.round(baseHits * multiplier);
 
       const pointsSpent = Math.round(trafficDelivered * 1.2);
-
       const dayLabel = isToday ? 'Hari Ini' : `${dayNames[dayIdx]}, ${d.getDate()} ${monthNames[d.getMonth()]}`;
       const fullDate = `${fullDayNames[dayIdx]}, ${d.getDate()} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
 
@@ -83,11 +100,11 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
     }
 
     return days;
-  }, [user.points, user.dailySurfedSeconds, user.streakDays, user.totalHitsReceived, websites]);
+  }, [isLiveMysql, liveTrend, user.points, user.dailySurfedSeconds, user.streakDays, user.totalHitsReceived, websites]);
 
   // Aggregate stats
   const total7dPoints = useMemo(
-    () => chartData.reduce((acc, d) => acc + d.pointsEarned, 0),
+    () => Math.round(chartData.reduce((acc, d) => acc + d.pointsEarned, 0) * 10) / 10,
     [chartData]
   );
   const total7dTraffic = useMemo(
@@ -147,14 +164,21 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
       {/* Chart Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
         <div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             <h3 className="text-sm font-semibold text-slate-100">
               Tren 7 Hari: Perolehan Poin & Distribusi Trafik
             </h3>
-            <span className="text-[10px] px-2 py-0.5 rounded-none bg-slate-800 text-slate-300 border border-slate-700/60 font-medium">
-              Live Recharts
-            </span>
+            {isLiveMysql ? (
+              <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-none bg-emerald-950/70 text-emerald-300 border border-emerald-800/50 font-mono font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Live MySQL
+              </span>
+            ) : (
+              <span className="text-[10px] px-2 py-0.5 rounded-none bg-slate-800 text-slate-300 border border-slate-700/60 font-mono font-medium">
+                Mode Demo
+              </span>
+            )}
           </div>
           <p className="text-xs text-slate-400 mt-0.5">
             Aktivitas berselancar (menghasilkan poin) berbanding kunjungan organik yang diterima situs web Anda
@@ -199,9 +223,10 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
       </div>
       <VwsRowDivider />
 
-      {/* Mini Summary Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
-        <div className="rounded-lg bg-slate-950/50 border border-slate-800/60 p-3">
+      {/* Mini Summary Stats Row — Velocity Smart-Line Grid */}
+      <div className="relative grid grid-cols-2 sm:grid-cols-4 bg-slate-950/50 my-4">
+        <VwsGridFrame hasBackground overhangPx={10} bleedPx={10} />
+        <div className="vws-grid-cell p-3">
           <span className="text-[11px] text-slate-400 block">Total Poin 7 Hari</span>
           <div className="flex items-center gap-1 mt-1">
             <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
@@ -211,7 +236,8 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
           </div>
         </div>
 
-        <div className="rounded-lg bg-slate-950/50 border border-slate-800/60 p-3">
+        <div className="vws-grid-cell p-3">
+          <VwsColumnDivider visibleFrom="always" overhangPx={10} />
           <span className="text-[11px] text-slate-400 block">Total Hits 7 Hari</span>
           <div className="flex items-center gap-1 mt-1">
             <Globe2 className="w-3.5 h-3.5 text-cyan-400" />
@@ -221,14 +247,18 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
           </div>
         </div>
 
-        <div className="rounded-lg bg-slate-950/50 border border-slate-800/60 p-3">
+        <div className="vws-grid-cell p-3">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={10} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <span className="text-[11px] text-slate-400 block">Rata-rata Kunjungan/Hari</span>
           <span className="font-mono font-bold text-slate-200 text-base tabular-nums mt-1 block">
             ~{averageDailyHits} hits/hari
           </span>
         </div>
 
-        <div className="rounded-lg bg-slate-950/50 border border-slate-800/60 p-3">
+        <div className="vws-grid-cell p-3">
+          <VwsColumnDivider visibleFrom="always" overhangPx={10} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <span className="text-[11px] text-slate-400 block">Status Rasio Akun</span>
           <div className="flex items-center gap-1.5 mt-1">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -334,9 +364,32 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-500">
         <div className="flex items-center gap-1.5">
           <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>Setiap 1 hits yang terkirim diverifikasi melewati evaluasi anti-cheat dan penargetan geo-lokasi Indonesia.</span>
+          <span>
+            {isLiveMysql
+              ? 'Data agregasi harian real-time langsung dari database MySQL (diperbarui otomatis tiap 30 detik).'
+              : 'Menampilkan data simulasi pratinjau. Login dengan akun WordPress Bridge untuk grafik MySQL real-time.'}
+          </span>
         </div>
-        <span className="text-slate-400 font-mono">Diperbarui: Real-time</span>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="text-slate-400 font-mono">
+            {isLiveMysql
+              ? lastSyncedTime
+                ? `Sync: ${lastSyncedTime}`
+                : 'Live MySQL'
+              : 'Preview Demo'}
+          </span>
+          {isLiveMysql && onManualRefresh && (
+            <button
+              type="button"
+              onClick={onManualRefresh}
+              disabled={isRefreshingLive}
+              title="Segarkan grafik tren 7 hari dari MySQL"
+              className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingLive ? 'animate-spin' : ''}`} />
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

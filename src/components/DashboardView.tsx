@@ -19,7 +19,7 @@ import { IndonesiaNetworkMap } from './IndonesiaNetworkMap';
 import { UserWeeklyTrendChart } from './UserWeeklyTrendChart';
 import { VwsTopLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider, VwsTableRowDivider } from './VwsSmartLine';
 import { APP_NAME, APP_CONFIG } from '../config/appConfig';
-import { wpAuthService, NetworkMapStatsResponse } from '../services/wordpressAuthService';
+import { wpAuthService, NetworkMapStatsResponse, WeeklyTrendResponse } from '../services/wordpressAuthService';
 
 const DASHBOARD_POLL_INTERVAL_MS = 30_000;
 
@@ -48,15 +48,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [mapRegion, setMapRegion] = useState<IndonesianRegionId>('nasional');
   const [liveNetworkStats, setLiveNetworkStats] = useState<NetworkMapStatsResponse | null>(null);
+  const [liveWeeklyTrend, setLiveWeeklyTrend] = useState<WeeklyTrendResponse | null>(null);
   const [isRefreshingLive, setIsRefreshingLive] = useState<boolean>(false);
   const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
   const isFetchingRef = useRef<boolean>(false);
 
-  // Unified real-time WordPress Bridge sync (Map MySQL stats + User/Websites KPIs)
+  // Unified real-time WordPress Bridge sync (Map MySQL stats + 7-Day Daily Rollup Trend + User/Websites KPIs)
   const syncDashboardRealtime = useCallback(
     async (forceFresh = false, includeAccountKpis = true) => {
       if (wpAuthService.getConfig().authMode !== 'bridge') {
         setLiveNetworkStats(null);
+        setLiveWeeklyTrend(null);
         return;
       }
       if (isFetchingRef.current) return;
@@ -64,20 +66,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       setIsRefreshingLive(true);
 
       try {
+        const markSynced = () => {
+          setLastSyncedTime(
+            new Date().toLocaleTimeString('id-ID', {
+              hour: '2-digit',
+              minute: '2-digit',
+              second: '2-digit',
+            })
+          );
+        };
+
         const tasks: Promise<unknown>[] = [
           wpAuthService.fetchNetworkMapStats(forceFresh).then((stats) => {
             if (stats && stats.source === 'mysql_live') {
               setLiveNetworkStats(stats);
-              setLastSyncedTime(
-                new Date().toLocaleTimeString('id-ID', {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  second: '2-digit',
-                })
-              );
+              markSynced();
             }
           }),
         ];
+
+        if (wpAuthService.isLiveBridgeActive()) {
+          tasks.push(
+            wpAuthService.fetchUserWeeklyTrend(forceFresh).then((trend) => {
+              if (trend && trend.source === 'mysql_live' && Array.isArray(trend.days)) {
+                setLiveWeeklyTrend(trend);
+                markSynced();
+              }
+            })
+          );
+        } else {
+          setLiveWeeklyTrend(null);
+        }
 
         if (includeAccountKpis && wpAuthService.isLiveBridgeActive() && onRefreshDashboardData) {
           tasks.push(onRefreshDashboardData().catch(() => undefined));
@@ -335,7 +354,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <VwsGridFrame hasBackground={false} overhangPx={18} bleedPx={18} />
         {/* Left 2 Cols: 7-Day Trend Line (Recharts) */}
         <div className="lg:col-span-2 py-4">
-          <UserWeeklyTrendChart user={user} websites={websites} />
+          <UserWeeklyTrendChart
+            user={user}
+            websites={websites}
+            liveTrend={liveWeeklyTrend}
+            isRefreshingLive={isRefreshingLive}
+            lastSyncedTime={lastSyncedTime}
+            onManualRefresh={() => syncDashboardRealtime(true, true)}
+          />
         </div>
 
         {/* Right 1 Col: Daily Surfing Goal & Anti-Cheat Summary */}

@@ -44,6 +44,24 @@ export interface NetworkMapStatsResponse {
   >;
 }
 
+export interface WeeklyTrendDay {
+  isoDate: string;
+  date: string;
+  dayLabel: string;
+  fullDate: string;
+  isToday: boolean;
+  pointsEarned: number;
+  trafficDelivered: number;
+  pointsSpent: number;
+  surfsCompleted: number;
+}
+
+export interface WeeklyTrendResponse {
+  source: 'mysql_live';
+  updatedAt: string;
+  days: WeeklyTrendDay[];
+}
+
 const isHostedProduction =
   typeof window !== 'undefined' &&
   window.location.hostname.endsWith('velocity.web.id');
@@ -456,6 +474,16 @@ class WordPressAuthService {
       `/network/stats${query}`,
       { method: 'GET' },
       Boolean(this.token)
+    );
+    return res.ok && res.data ? res.data : null;
+  }
+
+  public async fetchUserWeeklyTrend(fresh = false): Promise<WeeklyTrendResponse | null> {
+    if (!this.isLiveBridgeActive()) return null;
+    const query = fresh ? '?fresh=1' : '';
+    const res = await this.request<WeeklyTrendResponse>(
+      `/user/weekly-trend${query}`,
+      { method: 'GET' }
     );
     return res.ok && res.data ? res.data : null;
   }
