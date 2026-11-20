@@ -9,6 +9,7 @@ import {
   BookOpen,
   ShieldCheck,
   Image as ImageIcon,
+  ArrowLeft,
 } from 'lucide-react';
 import { UserProfile, GeoStatus } from '../types';
 
@@ -25,6 +26,7 @@ interface UserProfileModalProps {
   onReturnToAdmin?: () => void;
   onOpenWordPressAuth?: () => void;
   onOpenBrandLogo?: () => void;
+  onReturnToLanding?: () => void;
   onOpenHelp?: () => void;
   onLogout?: () => void;
 }
@@ -42,6 +44,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onReturnToAdmin,
   onOpenWordPressAuth,
   onOpenBrandLogo,
+  onReturnToLanding,
   onOpenHelp,
   onLogout,
 }) => {
@@ -247,6 +250,23 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 </span>
               </div>
               <span className="text-[10px] text-blue-400 font-mono">Kelola →</span>
+            </button>
+          )}
+
+          {!isLiveConnected && onReturnToLanding && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onReturnToLanding();
+              }}
+              className="w-full py-2.5 px-3 rounded-xl border border-slate-700 bg-slate-800/70 hover:bg-slate-800 text-slate-200 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <ArrowLeft className="w-4 h-4 text-emerald-400" />
+                <span>Kembali ke Halaman Utama (Beranda)</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">Beranda →</span>
             </button>
           )}
 

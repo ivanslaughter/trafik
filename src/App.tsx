@@ -15,7 +15,7 @@ import {
 import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, GeoStatus } from './types';
 import { antiCheatEngine } from './services/antiCheatEngine';
 import { wpAuthService } from './services/wordpressAuthService';
-import { HelpCircle, Ban, MapPin } from 'lucide-react';
+import { HelpCircle, Ban, MapPin, ArrowLeft, LogIn } from 'lucide-react';
 import { APP_NAME, APP_CONFIG, getPageTitle } from './config/appConfig';
 import { AntiCheatToastContainer, AntiCheatToastItem } from './components/AntiCheatToast';
 import { BrandMark } from './components/BrandMark';
@@ -143,6 +143,7 @@ export default function App() {
   const [brandLogoModalOpen, setBrandLogoModalOpen] = useState<boolean>(false);
   const [manualChallengeOpen, setManualChallengeOpen] = useState<boolean>(false);
   const [wpAuthModalOpen, setWpAuthModalOpen] = useState<boolean>(false);
+  const [landingScrollToAuth, setLandingScrollToAuth] = useState<boolean>(false);
   const [geoStatus, setGeoStatus] = useState<GeoStatus | null>(wpAuthService.getCachedGeoStatus());
   const [surfNotice, setSurfNotice] = useState<string>('');
   const [brandLogo, setBrandLogo] = useState<BrandLogoConfig>(() => loadStoredBrandLogo());
@@ -258,15 +259,19 @@ export default function App() {
 
   const handleEnterWorkspace = (targetTab = 'dashboard') => {
     sessionStorage.setItem('tn_entered_workspace', 'true');
+    setLandingScrollToAuth(false);
     setCurrentTab(targetTab);
     setShowLanding(false);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleReturnToLanding = () => {
+  const handleReturnToLanding = (focusAuth = false) => {
     sessionStorage.removeItem('tn_entered_workspace');
+    setLandingScrollToAuth(focusAuth);
     setShowLanding(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!focusAuth) {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const handleWordPressLoginSuccess = (wpUserData: UserProfile) => {
@@ -884,6 +889,7 @@ export default function App() {
           currentUser={user}
           brandLogo={brandLogo}
           isLiveConnected={wpAuthService.isLiveBridgeActive()}
+          initialScrollToAuth={landingScrollToAuth}
           onEnterWorkspace={handleEnterWorkspace}
           onAuthenticatedUser={(authedUser) => {
             setUser(authedUser);
@@ -901,6 +907,8 @@ export default function App() {
       </Suspense>
     );
   }
+
+  const isGuestDemoMode = !wpAuthService.isLiveBridgeActive();
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
@@ -921,6 +929,36 @@ export default function App() {
         onOpenPricing={() => setPricingModalOpen(true)}
         onOpenProfile={() => setProfileModalOpen(true)}
       />
+
+      {/* Demo Preview Bar for Logged-Out / New Visitors with Quick Back to Landing & Signup */}
+      {isGuestDemoMode && (
+        <div className="bg-slate-900/95 border-b border-emerald-500/25 px-4 sm:px-6 lg:px-8 py-2 text-xs">
+          <div className="mx-auto max-w-7xl flex flex-wrap items-center justify-between gap-2.5">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => handleReturnToLanding(false)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border border-slate-700 bg-slate-800/80 hover:bg-slate-700 hover:border-slate-600 text-slate-100 font-medium transition-colors cursor-pointer shrink-0"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Kembali ke Beranda</span>
+              </button>
+              <span className="text-slate-400 hidden sm:inline truncate">
+                Mode Pratinjau Demo — Jelajahi fitur dasbor sebelum mendaftar akun gratis.
+              </span>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => handleReturnToLanding(true)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors cursor-pointer shrink-0"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Masuk / Daftar Gratis</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {surfNotice && (
         <div className="bg-rose-950/90 border-b border-rose-800/80 px-4 py-2.5 text-xs text-rose-200">
@@ -1103,6 +1141,7 @@ export default function App() {
             onReturnToAdmin={handleReturnToAdmin}
             onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
             onOpenBrandLogo={() => setBrandLogoModalOpen(true)}
+            onReturnToLanding={() => handleReturnToLanding(false)}
             onOpenHelp={() => setCurrentTab('help')}
             onLogout={handleWordPressLogout}
           />
@@ -1160,7 +1199,7 @@ export default function App() {
 
           <div className="flex flex-wrap items-center gap-4 text-slate-400">
             <button
-              onClick={handleReturnToLanding}
+              onClick={() => handleReturnToLanding(false)}
               className="hover:text-slate-200 transition-colors cursor-pointer"
             >
               Beranda

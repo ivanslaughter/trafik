@@ -31,6 +31,7 @@ interface LandingPageProps {
   currentUser: UserProfile;
   brandLogo?: BrandLogoConfig;
   isLiveConnected: boolean;
+  initialScrollToAuth?: boolean;
   onEnterWorkspace: (targetTab?: string) => void;
   onAuthenticatedUser: (user: UserProfile) => void;
 }
@@ -104,6 +105,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   currentUser,
   brandLogo,
   isLiveConnected,
+  initialScrollToAuth = false,
   onEnterWorkspace,
   onAuthenticatedUser,
 }) => {
@@ -127,6 +129,14 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       wpAuthService.checkGeoAccess().then((status) => setGeoStatus(status));
     }
   }, []);
+
+  useEffect(() => {
+    if (initialScrollToAuth) {
+      setTimeout(() => {
+        document.getElementById('daftar-masuk')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
+    }
+  }, [initialScrollToAuth]);
 
   const markImageFailed = (key: string) => {
     setFailedImages((prev) => ({ ...prev, [key]: true }));
