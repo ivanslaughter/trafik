@@ -4,6 +4,9 @@
   --font-sans: "Space Grotesk", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
+  /* Velocity (velocity.web.id) Content Width: 1350px */
+  --container-7xl: 1350px;
+
   /* Velocity (velocity.web.id) Architectural Sharp Geometry: 0px box corners everywhere */
   --radius-xs: 0px;
   --radius-sm: 0px;
