@@ -19,6 +19,7 @@ import { HelpCircle, Ban, MapPin, ArrowLeft, LogIn } from 'lucide-react';
 import { APP_NAME, APP_CONFIG, getPageTitle } from './config/appConfig';
 import { AntiCheatToastContainer, AntiCheatToastItem } from './components/AntiCheatToast';
 import { BrandMark } from './components/BrandMark';
+import { VwsTopLine } from './components/VwsSmartLine';
 import {
   BrandLogoConfig,
   loadStoredBrandLogo,
@@ -153,14 +154,20 @@ export default function App() {
     applyBrandFavicon(brandLogo.faviconDataUrl || null);
   }, [brandLogo.faviconDataUrl]);
 
-  // Pull global branding logo from WordPress Bridge (public endpoint) on mount
+  // Pull global branding logo from public WordPress Bridge endpoint (works in Preview & Production)
   useEffect(() => {
-    if (wpAuthService.getConfig().authMode !== 'bridge') return;
     wpAuthService.fetchBranding().then((remote) => {
-      if (remote) {
-        setBrandLogo(remote);
-        saveStoredBrandLogo(remote);
-      }
+      if (!remote) return;
+      setBrandLogo((current) => {
+        const localTs = current.updatedAt ? Date.parse(current.updatedAt) : 0;
+        const remoteTs = remote.updatedAt ? Date.parse(remote.updatedAt) : 0;
+        // Prefer remote when local has no logo yet, live bridge is active, or remote is newer/equal
+        if (!current.logoDataUrl || wpAuthService.isLiveBridgeActive() || remoteTs >= localTs) {
+          saveStoredBrandLogo(remote);
+          return remote;
+        }
+        return current;
+      });
     });
   }, []);
 
@@ -1189,7 +1196,8 @@ export default function App() {
       />
 
       {/* Clean, Understated Footer conforming to Anti-Slop Guidelines */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
+      <footer className="relative bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
+        <VwsTopLine bleed={false} />
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <BrandMark brandLogo={brandLogo} size="footer" />

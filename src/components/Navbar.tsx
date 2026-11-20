@@ -3,6 +3,7 @@ import { Play, Square, Sparkles, User, ShieldCheck } from 'lucide-react';
 import { UserProfile } from '../types';
 import { BrandLogoConfig } from '../utils/logoBranding';
 import { BrandMark } from './BrandMark';
+import { VwsTopLine, VwsBottomLine } from './VwsSmartLine';
 
 interface NavbarProps {
   currentTab: string;
@@ -37,7 +38,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   ];
 
   return (
-    <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
+    <header className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md relative">
+      <VwsBottomLine bleed={false} />
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         {/* Zone 1: Brand Zone logo / wordmark */}
         <button
@@ -133,8 +135,9 @@ export const Navbar: React.FC<NavbarProps> = ({
       {/* Compact Mobile Horizontal Scrollable Nav Strip (<lg viewports) */}
       <nav
         aria-label="Navigasi seluler"
-        className="lg:hidden border-t border-slate-800/80 bg-slate-950/95 px-3 overflow-x-auto no-scrollbar"
+        className="lg:hidden relative bg-slate-950/95 px-3 overflow-x-auto no-scrollbar"
       >
+        <VwsTopLine bleed={false} />
         <div className="flex items-center gap-1.5 min-w-max py-1.5">
           {navItems.map((item) => {
             const isActive = currentTab === item.id;

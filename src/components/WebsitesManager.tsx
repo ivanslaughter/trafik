@@ -27,6 +27,7 @@ import { INDONESIAN_REGIONS } from '../data/mockData';
 import { auditWebsiteCompliance } from '../services/complianceAuditEngine';
 import { wpAuthService } from '../services/wordpressAuthService';
 import { APP_CONFIG, APP_NAME } from '../config/appConfig';
+import { VwsRowDivider, VwsBottomLine } from './VwsSmartLine';
 import {
   ClientUrlValidationResult,
   validateWebsiteUrlClientSide,
@@ -400,7 +401,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   return (
     <div className="space-y-6">
       {/* Header and Add Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
+        <VwsBottomLine bleedPx={16} />
         <div>
           <h2 className="text-lg font-bold text-slate-100">
             Kelola Website Anda
@@ -526,7 +528,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                   </div>
 
                   {/* Target specs */}
-                  <div className="mt-4 pt-3 border-t border-slate-800/80 grid grid-cols-3 gap-2 text-xs">
+                  <VwsRowDivider className="mt-4 mb-3" />
+                  <div className="grid grid-cols-3 gap-2 text-xs">
                     <div>
                       <span className="text-slate-500 block text-[11px]">Penargetan</span>
                       <span className="text-slate-300 font-medium capitalize">
@@ -571,7 +574,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                 </div>
 
                 {/* Card Actions */}
-                <div className="mt-4 pt-3 border-t border-slate-800/80 flex items-center justify-between gap-2">
+                <VwsRowDivider className="mt-4 mb-3" />
+                <div className="flex items-center justify-between gap-2">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <button
                       onClick={() => onToggleStatus(site.id)}

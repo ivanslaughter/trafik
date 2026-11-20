@@ -661,7 +661,7 @@ class WordPressAuthService {
   }
 
   public async fetchBranding(): Promise<BrandLogoConfig | null> {
-    if (this.config.authMode !== 'bridge') return null;
+    if (!this.config.wpUrl) return null;
     const res = await this.request<{ branding?: BrandLogoConfig | null }>(
       '/branding',
       { method: 'GET' },

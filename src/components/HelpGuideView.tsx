@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { APP_NAME } from '../config/appConfig';
 import { UserProfile } from '../types';
+import { VwsGridFrame, VwsRowDivider, VwsSmartLine, VwsTopLine } from './VwsSmartLine';
 
 interface HelpGuideViewProps {
   user: UserProfile;
@@ -229,7 +230,8 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 sm:p-8">
+      <div className="relative bg-slate-900/70 p-6 sm:p-8">
+        <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
           <div className="max-w-2xl">
             <div className="flex items-center gap-2 text-xs font-mono text-emerald-400 mb-2">
@@ -264,7 +266,8 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
         </div>
 
         {/* Category Filter Buttons */}
-        <div className="mt-6 pt-5 border-t border-slate-800/80 flex flex-wrap gap-2">
+        <VwsRowDivider className="mt-6 mb-5" />
+        <div className="flex flex-wrap gap-2">
           {GUIDE_CATEGORIES.map((cat) => {
             const active = activeCategory === cat.id;
             return (
@@ -307,12 +310,41 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {filteredArticles.map((article) => (
-            <article
-              key={article.id}
-              className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 flex flex-col justify-between"
-            >
+        <div className="relative grid grid-cols-1 lg:grid-cols-2 bg-slate-900/70">
+          <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
+          {filteredArticles.length > 1 && (
+            <VwsSmartLine
+              orientation="vertical"
+              offsetStart="26px"
+              offsetEnd="26px"
+              className="hidden lg:block absolute left-1/2 z-10"
+              style={{ top: '-18px', height: 'calc(100% + 36px)' }}
+            />
+          )}
+          {filteredArticles.map((article, articleIdx) => {
+            const isLeftCol = articleIdx % 2 === 0;
+            return (
+              <article
+                key={article.id}
+                className="vws-grid-cell p-6 flex flex-col justify-between hover:bg-slate-900/90"
+              >
+                {/* Mobile single-column row divider */}
+                {articleIdx > 0 && (
+                  <VwsTopLine bleedPx={18} className="lg:hidden" />
+                )}
+                {/* Desktop 2-column continuous row divider with left/right outer fade bleed */}
+                {articleIdx >= 2 && (
+                  <VwsSmartLine
+                    orientation="horizontal"
+                    offsetStart={isLeftCol ? '26px' : '0px'}
+                    offsetEnd={isLeftCol ? '0px' : '26px'}
+                    className="hidden lg:block absolute top-0 z-10"
+                    style={{
+                      left: isLeftCol ? '-18px' : '0px',
+                      right: isLeftCol ? '0px' : '-18px',
+                    }}
+                  />
+                )}
               <div>
                 <div className="flex items-center justify-between gap-3 mb-3">
                   <div className="inline-flex items-center gap-2 text-xs font-medium text-slate-300">
@@ -330,7 +362,8 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
                   {article.summary}
                 </p>
 
-                <ol className="mt-5 space-y-2.5 border-t border-slate-800/80 pt-4">
+                <VwsRowDivider className="mt-5 mb-4" />
+                <ol className="space-y-2.5">
                   {article.steps.map((step, idx) => (
                     <li key={idx} className="flex items-start gap-2.5 text-xs text-slate-200 leading-relaxed">
                       <span className="font-mono text-[11px] font-bold text-emerald-400 mt-0.5 shrink-0">
@@ -342,7 +375,8 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
                 </ol>
               </div>
 
-              <div className="mt-6 pt-4 border-t border-slate-800/80 space-y-3">
+              <div className="mt-6 space-y-3">
+                <VwsRowDivider className="mb-4" />
                 <div className="flex items-start gap-2 text-[11px] text-slate-400 leading-relaxed">
                   <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                   <span>{article.note}</span>
@@ -359,13 +393,15 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
                   </button>
                 )}
               </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </div>
       )}
 
       {/* Troubleshooting Accordion */}
-      <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8">
+      <div className="relative bg-slate-900/60 p-6 sm:p-8">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
         <h2 className="text-lg font-bold text-slate-100">
           Pemecahan Masalah Umum (Troubleshooting)
         </h2>
@@ -373,31 +409,34 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
           Solusi cepat apabila terjadi jeda timer, kampanye tidak berputar, atau status akun ditangguhkan.
         </p>
 
-        <div className="divide-y divide-slate-800/80">
-          {TROUBLESHOOTING_FAQS.map((item) => {
+        <div>
+          {TROUBLESHOOTING_FAQS.map((item, faqIdx) => {
             const isOpen = openFaq === item.id;
             return (
-              <div key={item.id} className="py-4 first:pt-0 last:pb-0">
-                <button
-                  type="button"
-                  onClick={() => setOpenFaq(isOpen ? '' : item.id)}
-                  className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
-                >
-                  <span className="text-sm font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                    {item.q}
-                  </span>
-                  <ChevronDown
-                    className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-                      isOpen ? 'rotate-180 text-emerald-400' : ''
-                    }`}
-                  />
-                </button>
-                {isOpen && (
-                  <p className="mt-2.5 text-xs sm:text-sm text-slate-400 leading-relaxed max-w-4xl">
-                    {item.a}
-                  </p>
-                )}
-              </div>
+              <React.Fragment key={item.id}>
+                {faqIdx > 0 && <VwsRowDivider />}
+                <div className="py-4 first:pt-0 last:pb-0">
+                  <button
+                    type="button"
+                    onClick={() => setOpenFaq(isOpen ? '' : item.id)}
+                    className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
+                  >
+                    <span className="text-sm font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                      {item.q}
+                    </span>
+                    <ChevronDown
+                      className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                        isOpen ? 'rotate-180 text-emerald-400' : ''
+                      }`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <p className="mt-2.5 text-xs sm:text-sm text-slate-400 leading-relaxed max-w-4xl">
+                      {item.a}
+                    </p>
+                  )}
+                </div>
+              </React.Fragment>
             );
           })}
         </div>

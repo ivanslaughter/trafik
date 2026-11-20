@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { TrendingUp, Sparkles, Globe2, ArrowUpRight, Calendar, Info } from 'lucide-react';
 import { UserProfile, WebsiteCampaign } from '../types';
+import { VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
 
 interface UserWeeklyTrendChartProps {
   user: UserProfile;
@@ -141,16 +142,17 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 overflow-hidden transition-all duration-200">
+    <div className="relative bg-slate-900/70 p-5 transition-all duration-200">
+      <VwsGridFrame hasBackground overhangPx={12} bleedPx={12} />
       {/* Chart Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-800/80">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-emerald-400" />
             <h3 className="text-sm font-semibold text-slate-100">
               Tren 7 Hari: Perolehan Poin & Distribusi Trafik
             </h3>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 border border-slate-700/60 font-medium">
+            <span className="text-[10px] px-2 py-0.5 rounded-none bg-slate-800 text-slate-300 border border-slate-700/60 font-medium">
               Live Recharts
             </span>
           </div>
@@ -195,6 +197,7 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
           </button>
         </div>
       </div>
+      <VwsRowDivider />
 
       {/* Mini Summary Stats Row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4">
@@ -327,7 +330,8 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
       </div>
 
       {/* Chart Footer Notice */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mt-3 pt-3 border-t border-slate-800/80 text-[11px] text-slate-500">
+      <VwsRowDivider className="mt-3 mb-3" />
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-[11px] text-slate-500">
         <div className="flex items-center gap-1.5">
           <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <span>Setiap 1 hits yang terkirim diverifikasi melewati evaluasi anti-cheat dan penargetan geo-lokasi Indonesia.</span>

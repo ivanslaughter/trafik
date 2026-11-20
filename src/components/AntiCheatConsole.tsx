@@ -18,6 +18,7 @@ import {
 import { AntiCheatLogEntry, AntiCheatSeverity, AntiCheatStatus } from '../types';
 import { antiCheatEngine } from '../services/antiCheatEngine';
 import { APP_NAME } from '../config/appConfig';
+import { VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
 
 interface AntiCheatConsoleProps {
   logs: AntiCheatLogEntry[];
@@ -212,7 +213,8 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
           <p className="text-xs text-slate-400 leading-relaxed">
             Penyaringan otomatis terhadap kata kunci judi online/slot gacor, penipuan phising, dan konten ilegal sebelum website diizinkan masuk ke rotasi audiens Indonesia.
           </p>
-          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
+          <VwsRowDivider className="mt-3 mb-2" />
+          <div className="flex items-center justify-between text-[11px]">
             <span className="text-slate-500">Filter Kominfo:</span>
             <span className="text-emerald-400 font-medium">100% Bebas Judi Slot</span>
           </div>
@@ -220,8 +222,9 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
       </div>
 
       {/* Interactive Anti-Cheat Testing Sandbox */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800 mb-4">
+      <div className="relative bg-slate-900/90 p-5">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <Terminal className="w-4 h-4 text-emerald-400" />
@@ -232,6 +235,7 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
             </p>
           </div>
         </div>
+        <VwsRowDivider className="mb-4" />
 
         {testNotification && (
           <div className="mb-4 p-3 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
@@ -316,8 +320,9 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
       </div>
 
       {/* Security Audit Feed */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800 mb-4">
+      <div className="relative bg-slate-900/70 p-5">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-2">
               <Terminal className="w-4 h-4 text-slate-400" />
@@ -383,6 +388,7 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
             </button>
           </div>
         </div>
+        <VwsRowDivider className="mb-4" />
 
         {/* Audit Log Entries List */}
         <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">

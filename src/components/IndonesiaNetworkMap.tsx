@@ -20,6 +20,7 @@ import {
 import { IndonesianRegionId } from '../types';
 import { INDONESIAN_REGIONS } from '../data/mockData';
 import { wpAuthService, NetworkMapStatsResponse } from '../services/wordpressAuthService';
+import { VwsTopLine, VwsBottomLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
 
 interface IndonesiaNetworkMapProps {
   onSelectRegion?: (regionId: IndonesianRegionId) => void;
@@ -1255,17 +1256,18 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
   return (
     <div
       ref={containerRef}
-      className="relative rounded-2xl border border-slate-800 bg-slate-900/80 p-5 overflow-hidden transition-all shadow-xl"
+      className="relative bg-slate-900/75 p-5 transition-all shadow-xl"
     >
+      <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
       {/* Header with Title & Live Stats */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-4">
         <div>
           <div className="flex items-center gap-2">
             <Globe className="w-5 h-5 text-emerald-400" />
             <h3 className="text-base font-bold text-slate-100">
               Peta Distribusi Trafik
             </h3>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-800/50 font-mono font-semibold">
+            <span className="text-[10px] px-2 py-0.5 rounded-none bg-emerald-950 text-emerald-300 border border-emerald-800/50 font-mono font-semibold">
               38 Provinsi Resmi · 515 Daerah
             </span>
           </div>
@@ -1320,9 +1322,11 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           )}
         </div>
       </div>
+      <VwsRowDivider />
 
       {/* Control Toolbar: Metric Switcher, Search, Zoom, Radar Toggle */}
-      <div className="flex flex-wrap items-center justify-between gap-3 py-3 border-b border-slate-800/60 text-xs">
+      <div className="flex flex-wrap items-center justify-between gap-3 py-3 text-xs relative">
+        <VwsBottomLine bleed={false} />
         {/* Metric Selector */}
         <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800">
           <span className="text-[11px] text-slate-500 px-2 font-medium">Metrik:</span>
@@ -1453,7 +1457,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
             <div className="flex items-center gap-1.5">
               <span className="text-slate-500 text-[10px]">Rendah</span>
               <div
-                className="w-20 h-2 rounded-full"
+                className="w-20 h-2 rounded-none"
                 style={{
                   background:
                     metricMode === 'hits'
@@ -1521,8 +1525,10 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
         </div>
 
         {/* Interactive Region-Aware Horizontal Top 5 Provinsi Teraktif Box Beneath Map */}
-        <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
+        <div className="relative bg-slate-950/60 p-4">
+          <VwsTopLine bleed={false} />
+          <VwsBottomLine bleed={false} />
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
                 <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
@@ -1534,7 +1540,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
                 <button
                   type="button"
                   onClick={() => handleSelectRegion('nasional')}
-                  className="text-[10px] font-medium text-emerald-300 hover:text-emerald-200 px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/50 transition-colors cursor-pointer"
+                  className="text-[10px] font-medium text-emerald-300 hover:text-emerald-200 px-2 py-0.5 bg-emerald-950/70 border border-emerald-800/50 transition-colors cursor-pointer"
                 >
                   ← Semua Nusantara
                 </button>
@@ -1555,7 +1561,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           </div>
 
           <div
-            className={`mt-3 grid grid-cols-1 gap-3 ${
+            className={`relative mt-1 grid grid-cols-1 ${
               topProvinces.length === 1
                 ? 'sm:grid-cols-1'
                 : topProvinces.length === 2
@@ -1567,6 +1573,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
                 : 'sm:grid-cols-2 lg:grid-cols-5'
             }`}
           >
+            <VwsGridFrame hasBackground overhangPx={14} bleedPx={14} />
             {topProvinces.map((prov, idx) => {
               const peakValue =
                 metricMode === 'hits'
@@ -1590,14 +1597,26 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
                   onClick={() => handleSelectProvince(prov.key, prov.regionId)}
                   onMouseEnter={() => setHoveredLeaderboardProvince(prov.key)}
                   onMouseLeave={() => setHoveredLeaderboardProvince(null)}
-                  className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
+                  className={`vws-grid-cell p-3.5 transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
-                      ? 'bg-emerald-950/80 border-emerald-500/80 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-400/30'
+                      ? 'bg-emerald-950/75'
                       : isRegionMatch
-                      ? 'bg-emerald-950/40 border-emerald-700/50 hover:bg-emerald-950/70'
-                      : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/60 hover:border-cyan-700/50'
+                      ? 'bg-emerald-950/35 hover:bg-emerald-950/65'
+                      : 'bg-slate-900/40 hover:bg-slate-800/60'
                   }`}
                 >
+                  {idx > 0 && (
+                    <VwsColumnDivider
+                      visibleFrom={topProvinces.length <= 3 ? 'sm' : 'lg'}
+                      overhangPx={14}
+                    />
+                  )}
+                  {idx > 0 && (
+                    <VwsTopLine
+                      bleed={false}
+                      className={topProvinces.length <= 3 ? 'sm:hidden' : 'lg:hidden'}
+                    />
+                  )}
                   <div>
                     <div className="flex items-center justify-between gap-1.5 text-xs">
                       <div className="flex items-center gap-2 min-w-0">
@@ -1626,9 +1645,9 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
                     </div>
 
                     {/* Progress track */}
-                    <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mt-2">
+                    <div className="w-full h-1.5 rounded-none bg-slate-800 overflow-hidden mt-2">
                       <div
-                        className={`h-full rounded-full transition-all duration-500 ${
+                        className={`h-full rounded-none transition-all duration-500 ${
                           metricMode === 'hits' ? 'bg-cyan-500' : 'bg-emerald-500'
                         }`}
                         style={{ width: `${percent}%` }}

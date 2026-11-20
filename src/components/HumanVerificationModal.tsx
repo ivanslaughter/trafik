@@ -121,7 +121,7 @@ export const HumanVerificationModal: React.FC<HumanVerificationModalProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs font-mono text-amber-400">
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-none bg-slate-800 border border-slate-700 text-xs font-mono text-amber-400">
             <Clock className="w-3.5 h-3.5" />
             <span className="tabular-nums font-semibold">{remainingSec}s</span>
           </div>

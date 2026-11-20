@@ -17,6 +17,7 @@ import {
 import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, IndonesianRegionId } from '../types';
 import { IndonesiaNetworkMap } from './IndonesiaNetworkMap';
 import { UserWeeklyTrendChart } from './UserWeeklyTrendChart';
+import { VwsTopLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider, VwsTableRowDivider } from './VwsSmartLine';
 import { APP_NAME, APP_CONFIG } from '../config/appConfig';
 import { wpAuthService, NetworkMapStatsResponse } from '../services/wordpressAuthService';
 
@@ -132,7 +133,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Hero Welcome & Quick Start Banner */}
-      <div className="rounded-2xl border border-slate-800 bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 p-6 sm:p-8 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-slate-900 via-slate-900/90 to-emerald-950/40 p-6 sm:p-8 relative">
+        <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
         <div className="relative z-10 max-w-2xl">
           <div className="flex items-center gap-2 text-xs font-semibold text-emerald-400 mb-2">
             <span className="flex h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
@@ -181,10 +183,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-radial from-emerald-500/10 via-transparent to-transparent pointer-events-none" />
       </div>
 
-      {/* 4 Core Quantitative Metrics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 4 Core Quantitative Metrics — Boxed with Background (Top, Bottom, First & Last + Inner Dividers) */}
+      <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 bg-slate-900/45">
+        <VwsGridFrame hasBackground overhangPx={20} bleedPx={20} />
+
         {/* Metric 1: Points Balance */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 flex flex-col justify-between">
+        <div className="vws-grid-cell p-5 flex flex-col justify-between hover:bg-slate-900/80">
           <div>
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>Saldo Poin {APP_NAME}</span>
@@ -199,19 +203,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <button
-              onClick={onOpenPricing}
-              className="text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
-            >
-              + Top Up Poin
-            </button>
-            <span className="text-slate-500">IDR/QRIS</span>
+          <div className="mt-4">
+            <VwsRowDivider className="mb-3" />
+            <div className="flex items-center justify-between text-xs">
+              <button
+                onClick={onOpenPricing}
+                className="text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
+              >
+                + Top Up Poin
+              </button>
+              <span className="text-slate-500">IDR/QRIS</span>
+            </div>
           </div>
         </div>
 
         {/* Metric 2: Hits Delivered to User's Sites */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 flex flex-col justify-between">
+        <div className="vws-grid-cell p-5 flex flex-col justify-between hover:bg-slate-900/80">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={20} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <div>
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>Kunjungan Diterima</span>
@@ -226,19 +235,24 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <span className="text-slate-400">{activeWebsitesCount} situs aktif</span>
-            <button
-              onClick={onOpenWebsites}
-              className="text-slate-300 hover:text-white cursor-pointer"
-            >
-              Detail →
-            </button>
+          <div className="mt-4">
+            <VwsRowDivider className="mb-3" />
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-slate-400">{activeWebsitesCount} situs aktif</span>
+              <button
+                onClick={onOpenWebsites}
+                className="text-slate-300 hover:text-white cursor-pointer"
+              >
+                Detail →
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Metric 3: Hits Given by User Surfing */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 flex flex-col justify-between">
+        <div className="vws-grid-cell p-5 flex flex-col justify-between hover:bg-slate-900/80">
+          <VwsColumnDivider visibleFrom="lg" overhangPx={20} />
+          <VwsTopLine bleed={false} className="lg:hidden" />
           <div>
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>Kunjungan Dikirim (Selancar)</span>
@@ -253,17 +267,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            <div className="flex items-center gap-1 text-amber-400 text-[11px] font-semibold">
-              <Flame className="w-3.5 h-3.5 fill-current" />
-              <span>Streak: {user.streakDays} Hari</span>
+          <div className="mt-4">
+            <VwsRowDivider className="mb-3" />
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1 text-amber-400 text-[11px] font-semibold">
+                <Flame className="w-3.5 h-3.5 fill-current" />
+                <span>Streak: {user.streakDays} Hari</span>
+              </div>
+              <span className="text-slate-500">Target 30m</span>
             </div>
-            <span className="text-slate-500">Target 30m</span>
           </div>
         </div>
 
         {/* Metric 4: Surf Ratio & Tier */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 flex flex-col justify-between">
+        <div className="vws-grid-cell p-5 flex flex-col justify-between hover:bg-slate-900/80">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={20} />
+          <VwsTopLine bleed={false} className="lg:hidden" />
           <div>
             <div className="flex items-center justify-between text-xs text-slate-400">
               <span>Rasio Selancar & Status</span>
@@ -282,18 +301,21 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </p>
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800 flex items-center justify-between text-xs">
-            {user.membership === 'gratis' ? (
-              <button
-                onClick={onOpenPricing}
-                className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
-              >
-                Upgrade Rasio 100% →
-              </button>
-            ) : (
-              <span className="text-amber-400 font-semibold">VIP Aktif</span>
-            )}
-            <span className="text-slate-500">Tier Akun</span>
+          <div className="mt-4">
+            <VwsRowDivider className="mb-3" />
+            <div className="flex items-center justify-between text-xs">
+              {user.membership === 'gratis' ? (
+                <button
+                  onClick={onOpenPricing}
+                  className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
+                >
+                  Upgrade Rasio 100% →
+                </button>
+              ) : (
+                <span className="text-amber-400 font-semibold">VIP Aktif</span>
+              )}
+              <span className="text-slate-500">Tier Akun</span>
+            </div>
           </div>
         </div>
       </div>
@@ -309,16 +331,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       />
 
       {/* 7-Day Trend Recharts Graph & Daily Goal / Anti-Cheat Cards */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="relative grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <VwsGridFrame hasBackground={false} overhangPx={18} bleedPx={18} />
         {/* Left 2 Cols: 7-Day Trend Line (Recharts) */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 py-4">
           <UserWeeklyTrendChart user={user} websites={websites} />
         </div>
 
         {/* Right 1 Col: Daily Surfing Goal & Anti-Cheat Summary */}
-        <div className="space-y-4">
+        <div className="relative lg:pl-6 space-y-4 py-4">
+          <VwsColumnDivider visibleFrom="lg" overhangPx={18} />
           {/* Daily Goal Card */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+          <div className="relative bg-slate-900/60 p-5">
+            <VwsGridFrame hasBackground overhangPx={12} bleedPx={12} />
             <div className="flex items-center justify-between text-xs font-semibold text-slate-200">
               <span>Target Selancar Harian</span>
               <span className="font-mono tabular-nums text-emerald-400">
@@ -327,9 +352,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             {/* Progress bar */}
-            <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden mt-3">
+            <div className="w-full h-2 rounded-none bg-slate-800 overflow-hidden mt-3">
               <div
-                className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                className="h-full bg-emerald-500 rounded-none transition-all duration-500"
                 style={{ width: `${dailyProgressPercent}%` }}
               />
             </div>
@@ -339,14 +364,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span>Target: {Math.floor(user.dailyTargetSeconds / 60)} menit</span>
             </div>
 
-            <div className="mt-4 pt-3 border-t border-slate-800/80 text-xs text-slate-300 flex items-center gap-2">
+            <VwsRowDivider className="mt-4 mb-3" />
+            <div className="text-xs text-slate-300 flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
               <span>Bonus +50 Poin harian setelah mencapai 30 menit.</span>
             </div>
           </div>
 
           {/* Anti-Cheat Guarantee Shield Card */}
-          <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+          <div className="relative bg-slate-900/60 p-5">
+            <VwsGridFrame hasBackground overhangPx={12} bleedPx={12} />
             <div className="flex items-center gap-2 text-emerald-400 mb-2">
               <ShieldCheck className="w-5 h-5" />
               <h3 className="text-sm font-bold text-slate-100">
@@ -383,8 +410,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Active Websites Snapshot Table */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
-        <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
+      <div className="relative bg-slate-900/60 p-5">
+        <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
+        <div className="flex items-center justify-between pb-3">
           <div>
             <h3 className="text-sm font-bold text-slate-100">
               Website Aktif Anda
@@ -401,11 +429,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             Lihat Semua Website →
           </button>
         </div>
+        <VwsRowDivider className="mb-4" />
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400">
+              <tr className="text-slate-400">
                 <th className="pb-3 font-semibold">Judul & URL</th>
                 <th className="pb-3 font-semibold">Target Wilayah</th>
                 <th className="pb-3 font-semibold">Durasi</th>
@@ -413,38 +442,42 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <th className="pb-3 font-semibold text-right">Sisa Poin</th>
                 <th className="pb-3 font-semibold text-right">Status</th>
               </tr>
+              <VwsTableRowDivider colSpan={6} />
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
-              {websites.map((site) => (
-                <tr key={site.id} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-3 max-w-xs">
-                    <div className="font-semibold text-slate-200 truncate">{site.title}</div>
-                    <div className="font-mono text-slate-400 truncate text-[11px]">{site.url}</div>
-                  </td>
-                  <td className="py-3 capitalize text-slate-300">
-                    {site.targetRegion.replace('_', ' ')}
-                  </td>
-                  <td className="py-3 text-slate-300 font-mono">
-                    {site.durationSec}s
-                  </td>
-                  <td className="py-3 text-right font-mono tabular-nums text-slate-200">
-                    {site.hitsDeliveredToday} hits
-                  </td>
-                  <td className="py-3 text-right font-mono tabular-nums text-emerald-400 font-semibold">
-                    {site.allocatedPoints.toLocaleString('id-ID')}
-                  </td>
-                  <td className="py-3 text-right">
-                    <span
-                      className={`text-[11px] px-2 py-0.5 rounded font-medium ${
-                        site.status === 'active'
-                          ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40'
-                          : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
-                      }`}
-                    >
-                      {site.status === 'active' ? 'Aktif' : 'Dijeda'}
-                    </span>
-                  </td>
-                </tr>
+            <tbody>
+              {websites.map((site, idx) => (
+                <React.Fragment key={site.id}>
+                  {idx > 0 && <VwsTableRowDivider colSpan={6} />}
+                  <tr className="hover:bg-slate-800/30 transition-colors">
+                    <td className="py-3 max-w-xs">
+                      <div className="font-semibold text-slate-200 truncate">{site.title}</div>
+                      <div className="font-mono text-slate-400 truncate text-[11px]">{site.url}</div>
+                    </td>
+                    <td className="py-3 capitalize text-slate-300">
+                      {site.targetRegion.replace('_', ' ')}
+                    </td>
+                    <td className="py-3 text-slate-300 font-mono">
+                      {site.durationSec}s
+                    </td>
+                    <td className="py-3 text-right font-mono tabular-nums text-slate-200">
+                      {site.hitsDeliveredToday} hits
+                    </td>
+                    <td className="py-3 text-right font-mono tabular-nums text-emerald-400 font-semibold">
+                      {site.allocatedPoints.toLocaleString('id-ID')}
+                    </td>
+                    <td className="py-3 text-right">
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded font-medium ${
+                          site.status === 'active'
+                            ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-800/40'
+                            : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
+                        }`}
+                      >
+                        {site.status === 'active' ? 'Aktif' : 'Dijeda'}
+                      </span>
+                    </td>
+                  </tr>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

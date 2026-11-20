@@ -23,6 +23,7 @@ import {
 import { WebsiteCampaign, WebsiteAuditStatus, WebsiteProbeResult } from '../types';
 import { auditWebsiteCompliance } from '../services/complianceAuditEngine';
 import { wpAuthService } from '../services/wordpressAuthService';
+import { VwsTopLine, VwsBottomLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider, VwsTableRowDivider } from './VwsSmartLine';
 
 interface WebsiteAuditConsoleProps {
   websites: WebsiteCampaign[];
@@ -91,7 +92,8 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
   return (
     <div className="space-y-6">
       {/* Title & Introduction */}
-      <div className="pb-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="relative pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <VwsBottomLine bleedPx={16} />
         <div>
           <div className="flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-rose-400" />
@@ -112,9 +114,10 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
         </div>
       </div>
 
-      {/* KPI Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/70">
+      {/* KPI Stats Grid — Boxed with Background (Top, Bottom, First & Last + Inner Dividers) */}
+      <div className="relative grid grid-cols-2 sm:grid-cols-5 bg-slate-900/70">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
+        <div className="vws-grid-cell p-4">
           <span className="text-[11px] text-slate-500 block">Total Situs Terdaftar</span>
           <span className="text-xl font-bold font-mono tabular-nums text-slate-100 mt-1 block">
             {totalAudited}
@@ -122,7 +125,8 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
           <span className="text-[11px] text-slate-400">Dalam database</span>
         </div>
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/70">
+        <div className="vws-grid-cell p-4">
+          <VwsColumnDivider visibleFrom="always" overhangPx={16} />
           <span className="text-[11px] text-slate-500 block">Lolos & Bersih</span>
           <span className="text-xl font-bold font-mono tabular-nums text-emerald-400 mt-1 block">
             {approvedCount}
@@ -130,7 +134,9 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
           <span className="text-[11px] text-slate-400">Aktif di rotasi</span>
         </div>
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/70">
+        <div className="vws-grid-cell p-4">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={16} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <span className="text-[11px] text-slate-500 block">Menunggu Review</span>
           <span className="text-xl font-bold font-mono tabular-nums text-amber-400 mt-1 block">
             {pendingCount}
@@ -138,7 +144,9 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
           <span className="text-[11px] text-slate-400">Butuh verifikasi</span>
         </div>
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/70">
+        <div className="vws-grid-cell p-4">
+          <VwsColumnDivider visibleFrom="always" overhangPx={16} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <span className="text-[11px] text-slate-500 block">Ditandai / Karantina</span>
           <span className="text-xl font-bold font-mono tabular-nums text-purple-400 mt-1 block">
             {flaggedCount}
@@ -146,7 +154,9 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
           <span className="text-[11px] text-slate-400">Laporan peselancar</span>
         </div>
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/70">
+        <div className="vws-grid-cell p-4">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={16} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <span className="text-[11px] text-slate-500 block">Ditolak / Diblokir</span>
           <span className="text-xl font-bold font-mono tabular-nums text-rose-400 mt-1 block">
             {rejectedCount}
@@ -156,13 +166,15 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
       </div>
 
       {/* Interactive Compliance URL Scanner Tool */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/90 p-5 shadow-xl">
-        <div className="flex items-center gap-2 pb-3 border-b border-slate-800 mb-4">
+      <div className="relative bg-slate-900/90 p-5 shadow-xl">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
+        <div className="flex items-center gap-2 pb-3">
           <Scan className="w-4 h-4 text-emerald-400" />
           <h3 className="text-sm font-bold text-slate-100">
             Uji Coba Langsung: Pemindai Kepatuhan URL (Compliance URL Scanner)
           </h3>
         </div>
+        <VwsRowDivider className="mb-4" />
         <p className="text-xs text-slate-400 mb-4">
           Masukkan URL atau judul website apapun untuk menguji bagaimana sistem mendeteksi kata kunci terselubung, leetspeak (misal: <em>sl0t</em>, <em>g4c0r</em>, <em>b0k3p</em>), atau domain berisiko tinggi.
         </p>
@@ -365,11 +377,12 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
       </div>
 
       {/* Websites Moderation Table */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 overflow-hidden shadow-xl">
+      <div className="relative bg-slate-900/70 shadow-xl">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400">
+              <tr className="bg-slate-950/60 text-slate-400">
                 <th className="py-3 px-4 font-semibold">Website & URL</th>
                 <th className="py-3 px-3 font-semibold">Kategori</th>
                 <th className="py-3 px-3 font-semibold text-center">Status Audit</th>
@@ -377,8 +390,9 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
                 <th className="py-3 px-3 font-semibold">Catatan Kepatuhan</th>
                 <th className="py-3 px-4 font-semibold text-right">Aksi Moderator</th>
               </tr>
+              <VwsTableRowDivider colSpan={6} />
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody>
               {filteredWebsites.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-500">
@@ -386,7 +400,7 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredWebsites.map((site) => {
+                filteredWebsites.map((site, idx) => {
                   let statusBadge = (
                     <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-950/60 text-emerald-300 border border-emerald-800/40">
                       Lolos / Bersih
@@ -414,7 +428,9 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
                   }
 
                   return (
-                    <tr key={site.id} className="hover:bg-slate-800/30 transition-colors">
+                    <React.Fragment key={site.id}>
+                      {idx > 0 && <VwsTableRowDivider colSpan={6} />}
+                      <tr className="hover:bg-slate-800/30 transition-colors">
                       {/* Title & URL */}
                       <td className="py-3.5 px-4 max-w-xs">
                         <div className="font-semibold text-slate-100 truncate">{site.title}</div>
@@ -512,6 +528,7 @@ export const WebsiteAuditConsole: React.FC<WebsiteAuditConsoleProps> = ({
                         </div>
                       </td>
                     </tr>
+                    </React.Fragment>
                   );
                 })
               )}

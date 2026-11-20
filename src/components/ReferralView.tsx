@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { APP_CONFIG, APP_NAME } from '../config/appConfig';
+import { VwsTopLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider, VwsTableRowDivider } from './VwsSmartLine';
 
 interface ReferralViewProps {
   user: UserProfile;
@@ -45,19 +46,20 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
   return (
     <div className="space-y-6">
       {/* Title */}
-      <div className="pb-4 border-b border-slate-800">
+      <div className="pb-4">
         <h2 className="text-lg font-bold text-slate-100">
           Program Afiliasi & Referral Nusantara
         </h2>
         <p className="text-xs text-slate-400 mt-0.5">
           Ajak sesama blogger, webmaster, dan pebisnis online Indonesia untuk mendapatkan komisi poin pasif seumur hidup.
         </p>
+        <VwsRowDivider className="mt-4" />
       </div>
 
       {/* Hero Referral Card */}
       <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-950 p-6 sm:p-8">
         <div className="max-w-2xl">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-300 mb-3">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-none bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-300 mb-3">
             <Gift className="w-3.5 h-3.5 text-emerald-400" />
             <span>Bonus Komisi 15% Seumur Hidup</span>
           </div>
@@ -104,9 +106,10 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
         </div>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/70">
+      {/* Stats Grid — Boxed with Background (Top, Bottom, First & Last + Inner Dividers) */}
+      <div className="relative grid grid-cols-1 sm:grid-cols-3 bg-slate-900/50">
+        <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
+        <div className="vws-grid-cell p-5 hover:bg-slate-900/80">
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span>Total Teman Diundang</span>
             <Users className="w-4 h-4 text-emerald-400" />
@@ -119,7 +122,9 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
           </div>
         </div>
 
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/70">
+        <div className="vws-grid-cell p-5 hover:bg-slate-900/80">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={18} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span>Total Poin Komisi Didapat</span>
             <Sparkles className="w-4 h-4 text-amber-400" />
@@ -133,7 +138,9 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
           </div>
         </div>
 
-        <div className="p-5 rounded-xl border border-slate-800 bg-slate-900/70">
+        <div className="vws-grid-cell p-5 hover:bg-slate-900/80">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={18} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <div className="flex items-center justify-between text-slate-400 text-xs">
             <span>Tingkat Komisi Aktif</span>
             <TrendingUp className="w-4 h-4 text-cyan-400" />
@@ -148,7 +155,8 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
       </div>
 
       {/* Referred Users Table */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-5">
+      <div className="relative bg-slate-900/70 p-5">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
         <h3 className="text-sm font-bold text-slate-100 mb-1">
           Daftar Member yang Anda Undang
         </h3>
@@ -159,35 +167,39 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800 text-slate-400">
+              <tr className="text-slate-400">
                 <th className="pb-3 font-semibold">Nama Pengguna</th>
                 <th className="pb-3 font-semibold">Wilayah Asal</th>
                 <th className="pb-3 font-semibold">Tanggal Daftar</th>
                 <th className="pb-3 font-semibold text-right">Poin Komisi</th>
                 <th className="pb-3 font-semibold text-right">Status Selancar</th>
               </tr>
+              <VwsTableRowDivider colSpan={5} />
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody>
               {mockReferralList.map((ref, idx) => (
-                <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                  <td className="py-3 font-medium text-slate-200">{ref.name}</td>
-                  <td className="py-3 text-slate-400">{ref.city}</td>
-                  <td className="py-3 text-slate-500 font-mono">{ref.date}</td>
-                  <td className="py-3 text-right font-mono tabular-nums text-emerald-400 font-semibold">
-                    +{ref.pointsEarned} Poin
-                  </td>
-                  <td className="py-3 text-right">
-                    <span
-                      className={`text-[11px] px-2 py-0.5 rounded ${
-                        ref.status.includes('Aktif')
-                          ? 'text-emerald-300 bg-emerald-950/40 border border-emerald-800/40'
-                          : 'text-slate-500 bg-slate-950 border border-slate-800'
-                      }`}
-                    >
-                      {ref.status}
-                    </span>
-                  </td>
-                </tr>
+                <React.Fragment key={idx}>
+                  {idx > 0 && <VwsTableRowDivider colSpan={5} />}
+                  <tr className="hover:bg-slate-800/30 transition-colors">
+                    <td className="py-3 font-medium text-slate-200">{ref.name}</td>
+                    <td className="py-3 text-slate-400">{ref.city}</td>
+                    <td className="py-3 text-slate-500 font-mono">{ref.date}</td>
+                    <td className="py-3 text-right font-mono tabular-nums text-emerald-400 font-semibold">
+                      +{ref.pointsEarned} Poin
+                    </td>
+                    <td className="py-3 text-right">
+                      <span
+                        className={`text-[11px] px-2 py-0.5 rounded ${
+                          ref.status.includes('Aktif')
+                            ? 'text-emerald-300 bg-emerald-950/40 border border-emerald-800/40'
+                            : 'text-slate-500 bg-slate-950 border border-slate-800'
+                        }`}
+                      >
+                        {ref.status}
+                      </span>
+                    </td>
+                  </tr>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

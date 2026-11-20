@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { APP_NAME } from '../config/appConfig';
+import { VwsBottomLine, VwsGridFrame, VwsTableRowDivider } from './VwsSmartLine';
 
 interface UserManagementViewProps {
   users: UserProfile[];
@@ -188,7 +189,8 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Title & Action Bar */}
-      <div className="pb-4 border-b border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="relative pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <VwsBottomLine bleedPx={16} />
         <div>
           <div className="flex items-center gap-2">
             <Users className="w-5 h-5 text-emerald-400" />
@@ -318,11 +320,12 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
       </div>
 
       {/* Users Table */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/70 overflow-hidden shadow-xl">
+      <div className="relative bg-slate-900/70 shadow-xl">
+        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-800 bg-slate-950/60 text-slate-400">
+              <tr className="bg-slate-950/60 text-slate-400">
                 <th className="py-3 px-4 font-semibold">Pengguna</th>
                 <th className="py-3 px-3 font-semibold">Peran & Wilayah</th>
                 <th className="py-3 px-3 font-semibold">Keanggotaan</th>
@@ -330,8 +333,9 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                 <th className="py-3 px-3 font-semibold text-center">Status</th>
                 <th className="py-3 px-4 font-semibold text-right">Aksi Administrator</th>
               </tr>
+              <VwsTableRowDivider colSpan={6} />
             </thead>
-            <tbody className="divide-y divide-slate-800/60">
+            <tbody>
               {filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="py-8 text-center text-slate-500">
@@ -339,18 +343,19 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((u) => {
+                filteredUsers.map((u, idx) => {
                   const isCurrent = u.id === currentUser.id;
                   const isSuspended = u.status === 'suspended';
                   const isVip = u.membership === 'pro_nusantara';
 
                   return (
-                    <tr
-                      key={u.id}
-                      className={`hover:bg-slate-800/30 transition-colors ${
-                        isCurrent ? 'bg-emerald-950/20' : ''
-                      }`}
-                    >
+                    <React.Fragment key={u.id}>
+                      {idx > 0 && <VwsTableRowDivider colSpan={6} />}
+                      <tr
+                        className={`hover:bg-slate-800/30 transition-colors ${
+                          isCurrent ? 'bg-emerald-950/20' : ''
+                        }`}
+                      >
                       {/* Name & Email */}
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
@@ -482,6 +487,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                         </div>
                       </td>
                     </tr>
+                    </React.Fragment>
                   );
                 })
               )}

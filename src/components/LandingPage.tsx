@@ -21,6 +21,7 @@ import { UserProfile, GeoStatus } from '../types';
 import { wpAuthService } from '../services/wordpressAuthService';
 import { BrandLogoConfig } from '../utils/logoBranding';
 import { BrandMark } from './BrandMark';
+import { VwsTopLine, VwsBottomLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
 import heroNetworkImg from '../assets/images/vel_hero_network_1795023164834.webp';
 import regionalTargetingImg from '../assets/images/vel_regional_targeting_1795023164349.webp';
 import anticheatGuardImg from '../assets/images/vel_anticheat_guard_1795023165931.webp';
@@ -229,7 +230,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans">
       {/* Strict 3-Zone Top Bar Contract */}
-      <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+      <header className="sticky top-0 z-40 w-full bg-slate-950/90 backdrop-blur-md relative">
+        <VwsBottomLine bleed={false} />
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6 lg:px-8">
           {/* Zone 1: Brand Logo / Wordmark */}
           <a
@@ -387,9 +389,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
           </div>
 
-          {/* Full-width 4-Column KPI Strip */}
-          <div className="mt-10 grid grid-cols-2 lg:grid-cols-4 gap-4 border-t border-b border-slate-800/80 py-6">
-            <div>
+          {/* Full-width 4-Column KPI Strip — Transparent Columns (Top & Bottom + Inner Dividers Only) */}
+          <div className="relative mt-10 grid grid-cols-2 lg:grid-cols-4">
+            <VwsGridFrame hasBackground={false} overhangPx={22} bleedPx={22} />
+            <div className="vws-grid-cell px-4 sm:px-5 py-7">
               <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-100">
                 38 Provinsi
               </div>
@@ -397,7 +400,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Cakupan penargetan audiens di seluruh Indonesia
               </div>
             </div>
-            <div>
+            <div className="vws-grid-cell px-4 sm:px-5 py-7">
+              <VwsColumnDivider visibleFrom="always" overhangPx={22} />
               <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-emerald-400">
                 6 Lapis
               </div>
@@ -405,7 +409,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Deteksi tab fokus, entropi kursor & anti speed-hack
               </div>
             </div>
-            <div>
+            <div className="vws-grid-cell px-4 sm:px-5 py-7">
+              <VwsColumnDivider visibleFrom="lg" overhangPx={22} />
+              <VwsTopLine bleed={false} className="lg:hidden" />
               <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-100">
                 1.500 Poin
               </div>
@@ -413,7 +419,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Saldo poin awal langsung aktif untuk member baru
               </div>
             </div>
-            <div>
+            <div className="vws-grid-cell px-4 sm:px-5 py-7">
+              <VwsColumnDivider visibleFrom="always" overhangPx={22} />
+              <VwsTopLine bleed={false} className="lg:hidden" />
               <div className="text-2xl sm:text-3xl font-bold font-mono tabular-nums text-slate-100">
                 0% Judi / 18+
               </div>
@@ -425,7 +433,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* 2. Mechanism / Core Capabilities Bento Grid with Flat-Vector SaaS Illustrations */}
-        <section id="cara-kerja" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20 border-t border-slate-900">
+        <section id="cara-kerja" className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
+          <VwsTopLine bleed={false} />
           <div className="max-w-2xl mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100 [text-wrap:balance]">
               Mekanisme pertukaran trafik yang adil dan terukur
@@ -456,7 +465,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </div>
 
                   {/* Interactive Regional Selector */}
-                  <div className="mt-6 pt-5 border-t border-slate-800/80">
+                  <div className="mt-6">
+                    <VwsRowDivider className="mb-5" />
                     <div className="flex flex-wrap gap-1.5 mb-3">
                       {REGION_HIGHLIGHTS.map((reg) => {
                         const active = selectedRegion.id === reg.id;
@@ -549,7 +559,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </p>
                 </div>
 
-                <ul className="mt-5 space-y-2 text-xs text-slate-300 border-t border-slate-800/80 pt-4">
+                <VwsRowDivider className="mt-5 mb-4" />
+                <ul className="space-y-2 text-xs text-slate-300">
                   <li className="flex items-start gap-2">
                     <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
                     <span>Tab Focus & Visibility Lock otomatis</span>
@@ -616,18 +627,24 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </p>
                   </div>
 
-                  <div className="mt-6 pt-5 border-t border-slate-800/80 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                  <VwsRowDivider className="mt-6 mb-5" />
+                  <div className="relative grid grid-cols-1 sm:grid-cols-3 bg-slate-950/70 text-xs">
+                    <VwsGridFrame hasBackground overhangPx={12} bleedPx={12} />
+                    <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
                       <Clock className="w-4 h-4 text-emerald-400 mb-2" />
                       <div className="font-semibold text-slate-100">Durasi 15–60 Detik</div>
                       <div className="text-slate-400 mt-1">Sesuaikan lama kunjungan tiap halaman</div>
                     </div>
-                    <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
+                      <VwsColumnDivider visibleFrom="sm" overhangPx={12} />
+                      <VwsTopLine bleed={false} className="sm:hidden" />
                       <SlidersHorizontal className="w-4 h-4 text-emerald-400 mb-2" />
                       <div className="font-semibold text-slate-100">Batas Hit Harian</div>
                       <div className="text-slate-400 mt-1">Jaga pertumbuhan trafik tetap stabil</div>
                     </div>
-                    <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
+                      <VwsColumnDivider visibleFrom="sm" overhangPx={12} />
+                      <VwsTopLine bleed={false} className="sm:hidden" />
                       <BarChart3 className="w-4 h-4 text-emerald-400 mb-2" />
                       <div className="font-semibold text-slate-100">Laporan Real-Time</div>
                       <div className="text-slate-400 mt-1">Pantau hit terkirim & sisa poin aktif</div>
@@ -659,7 +676,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* 3. How-To Guide for New Users + FAQ for Returning Users */}
-        <section id="panduan" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20 border-t border-slate-900">
+        <section id="panduan" className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
+          <VwsTopLine bleed={false} />
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 mb-10">
             <div className="max-w-2xl">
               <div className="text-xs font-mono text-emerald-400 mb-2">
@@ -683,13 +701,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </button>
           </div>
 
-          {/* 4-Step Quick Guide Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {QUICK_GUIDE_STEPS.map((item) => (
+          {/* 4-Step Quick Guide Grid — Boxed with Background (Top, Bottom, First & Last + Inner Dividers) */}
+          <div className="relative grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 bg-slate-900/40">
+            <VwsGridFrame hasBackground overhangPx={20} bleedPx={20} />
+            {QUICK_GUIDE_STEPS.map((item, idx) => (
               <div
                 key={item.step}
-                className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 flex flex-col justify-between"
+                className="vws-grid-cell p-6 flex flex-col justify-between hover:bg-slate-900/80"
               >
+                {idx > 0 && (
+                  <VwsColumnDivider
+                    visibleFrom={idx === 2 ? 'lg' : 'sm'}
+                    overhangPx={20}
+                  />
+                )}
+                {idx > 0 && (
+                  <VwsTopLine
+                    bleed={false}
+                    className={idx === 1 ? 'sm:hidden' : 'lg:hidden'}
+                  />
+                )}
                 <div>
                   <div className="text-xs font-mono font-bold text-emerald-400 mb-3">
                     Langkah {item.step}
@@ -701,7 +732,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     {item.summary}
                   </p>
                 </div>
-                <div className="mt-5 pt-3 border-t border-slate-800/80 text-[11px] text-slate-400 leading-relaxed">
+                <div className="mt-5 text-[11px] text-slate-400 leading-relaxed">
+                  <VwsRowDivider className="mb-3" />
                   {item.tip}
                 </div>
               </div>
@@ -709,7 +741,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
 
           {/* Interactive FAQ Accordion */}
-          <div className="mt-12 rounded-2xl border border-slate-800 bg-slate-900/40 p-6 sm:p-8">
+          <div className="relative mt-12 bg-slate-900/40 p-6 sm:p-8">
+            <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
               <div>
                 <h3 className="text-lg font-bold text-slate-100">
@@ -728,31 +761,34 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </button>
             </div>
 
-            <div className="divide-y divide-slate-800/80">
-              {LANDING_FAQS.map((faq) => {
+            <div>
+              {LANDING_FAQS.map((faq, faqIdx) => {
                 const isOpen = openFaqId === faq.id;
                 return (
-                  <div key={faq.id} className="py-4 first:pt-0 last:pb-0">
-                    <button
-                      type="button"
-                      onClick={() => setOpenFaqId(isOpen ? '' : faq.id)}
-                      className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
-                    >
-                      <span className="text-sm font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                        {faq.question}
-                      </span>
-                      <ChevronDown
-                        className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-                          isOpen ? 'rotate-180 text-emerald-400' : ''
-                        }`}
-                      />
-                    </button>
-                    {isOpen && (
-                      <p className="mt-2.5 text-xs sm:text-sm text-slate-400 leading-relaxed max-w-4xl">
-                        {faq.answer}
-                      </p>
-                    )}
-                  </div>
+                  <React.Fragment key={faq.id}>
+                    {faqIdx > 0 && <VwsRowDivider />}
+                    <div className="py-4 first:pt-0 last:pb-0">
+                      <button
+                        type="button"
+                        onClick={() => setOpenFaqId(isOpen ? '' : faq.id)}
+                        className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
+                      >
+                        <span className="text-sm font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
+                          {faq.question}
+                        </span>
+                        <ChevronDown
+                          className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
+                            isOpen ? 'rotate-180 text-emerald-400' : ''
+                          }`}
+                        />
+                      </button>
+                      {isOpen && (
+                        <p className="mt-2.5 text-xs sm:text-sm text-slate-400 leading-relaxed max-w-4xl">
+                          {faq.answer}
+                        </p>
+                      )}
+                    </div>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -760,7 +796,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* 4. Social Proof / Webmaster Case Results */}
-        <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 border-t border-slate-900">
+        <section className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14">
+          <VwsTopLine bleed={false} />
           <div className="mb-8">
             <h2 className="text-2xl font-bold tracking-tight text-slate-100">
               Hasil nyata dari pemilik website Indonesia
@@ -770,8 +807,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <article className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 sm:p-7 flex flex-col justify-between">
+          <div className="relative grid grid-cols-1 md:grid-cols-2 bg-slate-900/40">
+            <VwsGridFrame hasBackground overhangPx={20} bleedPx={20} />
+            <article className="vws-grid-cell p-6 sm:p-7 flex flex-col justify-between hover:bg-slate-900/75">
               <div>
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-mono mb-3">
                   <span>+165% Kunjungan Harian</span>
@@ -782,14 +820,17 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   "Sebelumnya bounce rate kampanye trafik kami tinggi karena pengunjung bot luar negeri. Setelah memindahkan kampanye ke {APP_NAME} dengan filter Jawa Barat dan durasi 45 detik, sinyal pembaca organik untuk artikel edukasi kami naik stabil selama 3 bulan berturut-turut."
                 </p>
               </div>
-              <div className="mt-5 pt-4 border-t border-slate-800/80 text-xs text-slate-400">
+              <div className="mt-5 text-xs text-slate-400">
+                <VwsRowDivider className="mb-4" />
                 <span className="font-semibold text-slate-200">Raka Pratama</span>
                 <span aria-hidden="true"> · </span>
                 <span>Pengelola Portal Edukasi Digital Bandung</span>
               </div>
             </article>
 
-            <article className="rounded-2xl border border-slate-800 bg-slate-900/50 p-6 sm:p-7 flex flex-col justify-between">
+            <article className="vws-grid-cell p-6 sm:p-7 flex flex-col justify-between hover:bg-slate-900/75">
+              <VwsColumnDivider visibleFrom="md" overhangPx={20} />
+              <VwsTopLine bleed={false} className="md:hidden" />
               <div>
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-mono mb-3">
                   <span>0 Pelanggaran Iklan</span>
@@ -800,7 +841,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   "Yang paling penting buat kami adalah filter anti-judi dan anti-redirect. Halaman katalog UMKM kami tidak pernah bersanding dengan situs bermasalah, dan poin hasil selancar tim bisa langsung dipakai menaikkan eksposur halaman produk baru."
                 </p>
               </div>
-              <div className="mt-5 pt-4 border-t border-slate-800/80 text-xs text-slate-400">
+              <div className="mt-5 text-xs text-slate-400">
+                <VwsRowDivider className="mb-4" />
                 <span className="font-semibold text-slate-200">Siti Rahmawati</span>
                 <span aria-hidden="true"> · </span>
                 <span>Koordinator Katalog UMKM Nusantara</span>
@@ -810,7 +852,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* 5. Membership Comparison */}
-        <section id="paket" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 border-t border-slate-900">
+        <section id="paket" className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14">
+          <VwsTopLine bleed={false} />
           <div className="max-w-2xl mb-10">
             <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">
               Pilih paket sesuai kebutuhan website Anda
@@ -820,9 +863,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="relative grid grid-cols-1 md:grid-cols-2 bg-slate-900/40">
+            <VwsGridFrame hasBackground overhangPx={20} bleedPx={20} />
+
             {/* Free Plan */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 sm:p-8 flex flex-col justify-between">
+            <div className="vws-grid-cell p-6 sm:p-8 flex flex-col justify-between hover:bg-slate-900/75">
               <div>
                 <div className="flex items-center justify-between gap-4">
                   <h3 className="text-lg font-bold text-slate-100">Member Gratis</h3>
@@ -832,7 +877,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   Cocok untuk blogger dan pemilik situs pemula yang ingin mulai bertukar kunjungan.
                 </p>
 
-                <ul className="mt-6 space-y-3 text-sm text-slate-300 border-t border-slate-800/80 pt-5">
+                <VwsRowDivider className="mt-6 mb-5" />
+                <ul className="space-y-3 text-sm text-slate-300">
                   <li className="flex items-center gap-2.5">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>Bonus pendaftaran 1.500 poin awal</span>
@@ -854,14 +900,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <button
                 onClick={() => scrollToAuth('register')}
-                className="mt-8 w-full py-2.5 px-4 rounded-lg border border-slate-700 hover:bg-slate-800 text-slate-100 text-xs font-semibold text-center transition-colors cursor-pointer"
+                className="mt-8 w-full py-2.5 px-4 border border-slate-700 hover:bg-slate-800 text-slate-100 text-xs font-semibold text-center transition-colors cursor-pointer"
               >
                 Mulai Akun Gratis
               </button>
             </div>
 
             {/* Pro Plan */}
-            <div className="rounded-2xl border border-emerald-500/50 bg-slate-900/80 p-6 sm:p-8 flex flex-col justify-between">
+            <div className="vws-grid-cell bg-slate-900/75 p-6 sm:p-8 flex flex-col justify-between hover:bg-slate-900/90">
+              <VwsColumnDivider visibleFrom="md" overhangPx={20} />
+              <VwsTopLine bleed={false} className="md:hidden" />
               <div>
                 <div className="flex items-center justify-between gap-4">
                   <h3 className="text-lg font-bold text-white">Pro Nusantara</h3>
@@ -871,7 +919,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   Untuk bisnis, agensi SEO, dan penerbit yang membutuhkan volume trafik maksimal.
                 </p>
 
-                <ul className="mt-6 space-y-3 text-sm text-slate-200 border-t border-slate-800 pt-5">
+                <VwsRowDivider className="mt-6 mb-5" />
+                <ul className="space-y-3 text-sm text-slate-200">
                   <li className="flex items-center gap-2.5">
                     <Check className="w-4 h-4 text-emerald-400 shrink-0" />
                     <span>Rasio perolehan penuh 100% (1.00 poin/kunjungan)</span>
@@ -893,7 +942,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <button
                 onClick={() => onEnterWorkspace('dashboard')}
-                className="mt-8 w-full py-2.5 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold text-center transition-colors cursor-pointer"
+                className="mt-8 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold text-center transition-colors cursor-pointer"
               >
                 Masuk & Lihat Detail Paket Pro
               </button>
@@ -902,7 +951,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         </section>
 
         {/* 6. Interactive New User Signup / Existing Member Entry */}
-        <section id="masuk" className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20 border-t border-slate-900">
+        <section id="masuk" className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14 lg:py-20">
+          <VwsTopLine bleed={false} />
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
             <div className="lg:col-span-5">
               <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100 [text-wrap:balance]">
@@ -1085,7 +1135,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       </main>
 
       {/* Quiet Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
+      <footer className="relative bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
+        <VwsTopLine bleed={false} />
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <BrandMark brandLogo={brandLogo} size="footer" />
