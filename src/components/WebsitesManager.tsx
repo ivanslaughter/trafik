@@ -60,6 +60,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   const [dailyLimit, setDailyLimit] = useState<number>(100);
   const [allocatedPoints, setAllocatedPoints] = useState<number>(200);
   const [referrerPolicy, setReferrerPolicy] = useState<'direct' | 'referral'>('direct');
+  const [utmEnabled, setUtmEnabled] = useState<boolean>(false);
   const [isProbing, setIsProbing] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [detectedViolationKeywords, setDetectedViolationKeywords] = useState<string[]>([]);
@@ -148,6 +149,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       status: 'active',
       iframeAllowed,
       referrerPolicy,
+      utmEnabled,
       auditStatus: 'approved',
       auditScore: auditResult.riskScore,
       reportedCount: 0,
@@ -610,8 +612,20 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                   <option value="referral">Referral (Tercatat datang dari trafik.velocity.web.id)</option>
                 </select>
                 <span className="text-[11px] text-slate-500 mt-1 block">
-                  Kunjungan membuka URL Anda secara langsung (Live Iframe / Tab Terkontrol) sehingga GA4 &amp; pixel analitik tetap mencatat sesi aktif.
+                  Kunjungan membuka URL Anda secara langsung (Live Iframe / Jendela Selancar) sehingga GA4 &amp; pixel analitik tetap mencatat sesi aktif.
                 </span>
+
+                <label className="mt-2.5 flex items-center gap-2 text-xs text-slate-300 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={utmEnabled}
+                    onChange={(e) => setUtmEnabled(e.target.checked)}
+                    className="w-3.5 h-3.5 rounded text-emerald-500 focus:ring-0 bg-slate-950 border-slate-700"
+                  />
+                  <span>
+                    Sematkan tag <code className="text-emerald-400">utm_source=trafik_id&amp;utm_medium=autosurf</code> agar terbaca rapi di laporan Akuisisi GA4
+                  </span>
+                </label>
               </div>
 
               {/* Actions */}

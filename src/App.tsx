@@ -3,18 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Suspense } from 'react';
 import { Navbar } from './components/Navbar';
-import { DashboardView } from './components/DashboardView';
-import { AutosurfViewer } from './components/AutosurfViewer';
-import { WebsitesManager } from './components/WebsitesManager';
-import { AntiCheatConsole } from './components/AntiCheatConsole';
-import { ReferralView } from './components/ReferralView';
-import { UserManagementView } from './components/UserManagementView';
-import { UserProfileModal } from './components/UserProfileModal';
-import { WebsiteAuditConsole } from './components/WebsiteAuditConsole';
-import { WordPressAuthModal } from './components/WordPressAuthModal';
-import { PricingModal } from './components/PricingModal';
 import { HumanVerificationModal } from './components/HumanVerificationModal';
 import {
   INITIAL_USER,
@@ -22,14 +12,64 @@ import {
   INITIAL_USER_WEBSITES,
   INITIAL_COMMUNITY_WEBSITES,
 } from './data/mockData';
-import { UserProfile, WebsiteCampaign, AntiCheatLogEntry } from './types';
+import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, GeoStatus } from './types';
 import { antiCheatEngine } from './services/antiCheatEngine';
 import { wpAuthService } from './services/wordpressAuthService';
-import { ShieldCheck, Heart, ExternalLink, HelpCircle, Ban, AlertTriangle } from 'lucide-react';
+import { HelpCircle, Ban, MapPin } from 'lucide-react';
 import { APP_NAME, APP_CONFIG, getPageTitle } from './config/appConfig';
 import { AntiCheatToastContainer, AntiCheatToastItem } from './components/AntiCheatToast';
-import { LandingPage } from './components/LandingPage';
-import { HelpGuideView } from './components/HelpGuideView';
+
+// Route & modal code-splitting for fast 4G mobile loading
+const LandingPage = React.lazy(() =>
+  import('./components/LandingPage').then((m) => ({ default: m.LandingPage }))
+);
+const DashboardView = React.lazy(() =>
+  import('./components/DashboardView').then((m) => ({ default: m.DashboardView }))
+);
+const AutosurfViewer = React.lazy(() =>
+  import('./components/AutosurfViewer').then((m) => ({ default: m.AutosurfViewer }))
+);
+const WebsitesManager = React.lazy(() =>
+  import('./components/WebsitesManager').then((m) => ({ default: m.WebsitesManager }))
+);
+const AntiCheatConsole = React.lazy(() =>
+  import('./components/AntiCheatConsole').then((m) => ({ default: m.AntiCheatConsole }))
+);
+const ReferralView = React.lazy(() =>
+  import('./components/ReferralView').then((m) => ({ default: m.ReferralView }))
+);
+const UserManagementView = React.lazy(() =>
+  import('./components/UserManagementView').then((m) => ({ default: m.UserManagementView }))
+);
+const WebsiteAuditConsole = React.lazy(() =>
+  import('./components/WebsiteAuditConsole').then((m) => ({ default: m.WebsiteAuditConsole }))
+);
+const HelpGuideView = React.lazy(() =>
+  import('./components/HelpGuideView').then((m) => ({ default: m.HelpGuideView }))
+);
+const UserProfileModal = React.lazy(() =>
+  import('./components/UserProfileModal').then((m) => ({ default: m.UserProfileModal }))
+);
+const WordPressAuthModal = React.lazy(() =>
+  import('./components/WordPressAuthModal').then((m) => ({ default: m.WordPressAuthModal }))
+);
+const PricingModal = React.lazy(() =>
+  import('./components/PricingModal').then((m) => ({ default: m.PricingModal }))
+);
+
+function RouteLoadingSkeleton() {
+  return (
+    <div className="space-y-4 animate-pulse" aria-busy="true" aria-label="Memuat halaman">
+      <div className="h-28 rounded-2xl border border-slate-800 bg-slate-900/70" />
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="h-24 rounded-xl border border-slate-800 bg-slate-900/60" />
+        <div className="h-24 rounded-xl border border-slate-800 bg-slate-900/60" />
+        <div className="h-24 rounded-xl border border-slate-800 bg-slate-900/60" />
+        <div className="h-24 rounded-xl border border-slate-800 bg-slate-900/60" />
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   // Public Landing Page vs Workspace State
@@ -87,11 +127,13 @@ export default function App() {
     return INITIAL_USER;
   });
 
-  // Modals
+  // Modals & Geo Status
   const [pricingModalOpen, setPricingModalOpen] = useState<boolean>(false);
   const [profileModalOpen, setProfileModalOpen] = useState<boolean>(false);
   const [manualChallengeOpen, setManualChallengeOpen] = useState<boolean>(false);
   const [wpAuthModalOpen, setWpAuthModalOpen] = useState<boolean>(false);
+  const [geoStatus, setGeoStatus] = useState<GeoStatus | null>(wpAuthService.getCachedGeoStatus());
+  const [surfNotice, setSurfNotice] = useState<string>('');
 
   // Sync users to localStorage
   useEffect(() => {
@@ -115,6 +157,10 @@ export default function App() {
     }
 
     setUser(me);
+    const cachedGeo = wpAuthService.getCachedGeoStatus();
+    if (cachedGeo) {
+      setGeoStatus(cachedGeo);
+    }
     const [websitesData, logsData] = await Promise.all([
       wpAuthService.fetchWebsites(),
       wpAuthService.fetchLogs(),
@@ -433,6 +479,11 @@ export default function App() {
           durationSec: actualDuration,
         })
         .then((res) => {
+          if (res?.geoBlocked) {
+            setSurfNotice(res.error || 'Sesi selancar dibatasi khusus IP Indonesia tanpa VPN.');
+            wpAuthService.checkGeoAccess(true).then((g) => setGeoStatus(g));
+            return;
+          }
           if (res?.user) setUser(res.user);
           if (res?.campaign) {
             const updated = res.campaign;
@@ -712,25 +763,48 @@ export default function App() {
     }
   };
 
+  const handleOpenSurfing = async () => {
+    setSurfNotice('');
+    if (user.status === 'suspended') {
+      setSurfNotice('Akun Anda ditangguhkan karena pelanggaran anti-cheat. Tidak dapat berselancar.');
+      return;
+    }
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      const checkedGeo = await wpAuthService.checkGeoAccess();
+      setGeoStatus(checkedGeo);
+      if (!checkedGeo.allowed && !checkedGeo.adminBypass && user.role !== 'admin') {
+        setSurfNotice(
+          checkedGeo.message || 'Akses selancar hanya tersedia untuk koneksi IP Indonesia tanpa VPN.'
+        );
+        return;
+      }
+    }
+
+    setCurrentTab('autosurf');
+  };
+
   if (showLanding) {
     return (
-      <LandingPage
-        currentUser={user}
-        isLiveConnected={wpAuthService.isLiveBridgeActive()}
-        onEnterWorkspace={handleEnterWorkspace}
-        onAuthenticatedUser={(authedUser) => {
-          setUser(authedUser);
-          setAllUsers((prev) => {
-            const exists = prev.some((u) => u.email === authedUser.email);
-            return exists
-              ? prev.map((u) => (u.email === authedUser.email ? authedUser : u))
-              : [authedUser, ...prev];
-          });
-          if (wpAuthService.isLiveBridgeActive()) {
-            syncFromWordPressBridge();
-          }
-        }}
-      />
+      <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
+        <LandingPage
+          currentUser={user}
+          isLiveConnected={wpAuthService.isLiveBridgeActive()}
+          onEnterWorkspace={handleEnterWorkspace}
+          onAuthenticatedUser={(authedUser) => {
+            setUser(authedUser);
+            setAllUsers((prev) => {
+              const exists = prev.some((u) => u.email === authedUser.email);
+              return exists
+                ? prev.map((u) => (u.email === authedUser.email ? authedUser : u))
+                : [authedUser, ...prev];
+            });
+            if (wpAuthService.isLiveBridgeActive()) {
+              syncFromWordPressBridge();
+            }
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -743,15 +817,33 @@ export default function App() {
         user={user}
         isSurfing={currentTab === 'autosurf'}
         onToggleSurfing={() => {
-          if (user.status === 'suspended') {
-            alert('Akun Anda ditangguhkan karena pelanggaran anti-cheat. Tidak dapat berselancar.');
+          if (currentTab === 'autosurf') {
+            setCurrentTab('dashboard');
             return;
           }
-          setCurrentTab(currentTab === 'autosurf' ? 'dashboard' : 'autosurf');
+          handleOpenSurfing();
         }}
         onOpenPricing={() => setPricingModalOpen(true)}
         onOpenProfile={() => setProfileModalOpen(true)}
       />
+
+      {surfNotice && (
+        <div className="bg-rose-950/90 border-b border-rose-800/80 px-4 py-2.5 text-xs text-rose-200">
+          <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <MapPin className="w-4 h-4 text-rose-400 shrink-0" />
+              <span>{surfNotice}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSurfNotice('')}
+              className="text-rose-300 hover:text-white font-semibold cursor-pointer shrink-0"
+            >
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Real-time Floating Anti-Cheat Toast Notifications */}
       <AntiCheatToastContainer
@@ -800,149 +892,143 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Content Area */}
+      {/* Main Content Area (Route-Level Code Split for 4G Speed) */}
       <main className="flex-1 mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {currentTab === 'dashboard' && (
-          <DashboardView
-            user={user}
-            websites={userWebsites}
-            logs={auditLogs}
-            onStartSurfing={() => {
-              if (user.status === 'suspended') {
-                alert('Akun Anda ditangguhkan karena pelanggaran anti-cheat. Tidak dapat berselancar.');
-                return;
-              }
-              setCurrentTab('autosurf');
-            }}
-            onOpenWebsites={() => setCurrentTab('websites')}
-            onOpenAntiCheat={() => setCurrentTab('anticheat')}
-            onOpenPricing={() => setPricingModalOpen(true)}
-            onOpenHelp={() => setCurrentTab('help')}
-          />
-        )}
+        <Suspense fallback={<RouteLoadingSkeleton />}>
+          {currentTab === 'dashboard' && (
+            <DashboardView
+              user={user}
+              websites={userWebsites}
+              logs={auditLogs}
+              onStartSurfing={handleOpenSurfing}
+              onOpenWebsites={() => setCurrentTab('websites')}
+              onOpenAntiCheat={() => setCurrentTab('anticheat')}
+              onOpenPricing={() => setPricingModalOpen(true)}
+              onOpenHelp={() => setCurrentTab('help')}
+            />
+          )}
 
-        {currentTab === 'autosurf' && (
-          <AutosurfViewer
-            user={user}
-            websites={communityWebsites}
-            onAwardPoints={handleAwardPoints}
-            onDeductSitePoints={handleDeductSitePoints}
-            onOpenPricing={() => setPricingModalOpen(true)}
-            onReportWebsite={handleReportWebsite}
-          />
-        )}
+          {currentTab === 'autosurf' && (
+            <AutosurfViewer
+              user={user}
+              websites={communityWebsites}
+              geoStatus={geoStatus}
+              onAwardPoints={handleAwardPoints}
+              onDeductSitePoints={handleDeductSitePoints}
+              onOpenPricing={() => setPricingModalOpen(true)}
+              onReportWebsite={handleReportWebsite}
+            />
+          )}
 
-        {currentTab === 'websites' && (
-          <WebsitesManager
-            user={user}
-            websites={userWebsites}
-            onAddWebsite={handleAddWebsite}
-            onToggleStatus={handleToggleWebsiteStatus}
-            onDeleteWebsite={handleDeleteWebsite}
-            onAddPointsToSite={handleAddPointsToSite}
-            onOpenPricing={() => setPricingModalOpen(true)}
-            onOpenAuditConsole={() => setCurrentTab('audit')}
-          />
-        )}
+          {currentTab === 'websites' && (
+            <WebsitesManager
+              user={user}
+              websites={userWebsites}
+              onAddWebsite={handleAddWebsite}
+              onToggleStatus={handleToggleWebsiteStatus}
+              onDeleteWebsite={handleDeleteWebsite}
+              onAddPointsToSite={handleAddPointsToSite}
+              onOpenPricing={() => setPricingModalOpen(true)}
+              onOpenAuditConsole={() => setCurrentTab('audit')}
+            />
+          )}
 
-        {currentTab === 'audit' && (
-          <WebsiteAuditConsole
-            websites={communityWebsites}
-            onApproveWebsite={handleApproveWebsite}
-            onRejectWebsite={handleRejectWebsite}
-            onQuarantineWebsite={handleQuarantineWebsite}
-          />
-        )}
+          {currentTab === 'audit' && (
+            <WebsiteAuditConsole
+              websites={communityWebsites}
+              onApproveWebsite={handleApproveWebsite}
+              onRejectWebsite={handleRejectWebsite}
+              onQuarantineWebsite={handleQuarantineWebsite}
+            />
+          )}
 
-        {currentTab === 'anticheat' && (
-          <AntiCheatConsole
-            logs={auditLogs}
-            onTriggerChallenge={() => setManualChallengeOpen(true)}
-          />
-        )}
+          {currentTab === 'anticheat' && (
+            <AntiCheatConsole
+              logs={auditLogs}
+              onTriggerChallenge={() => setManualChallengeOpen(true)}
+            />
+          )}
 
-        {currentTab === 'referral' && <ReferralView user={user} />}
+          {currentTab === 'referral' && <ReferralView user={user} />}
 
-        {currentTab === 'users' && user.role === 'admin' && (
-          <UserManagementView
-            users={allUsers}
-            currentUser={user}
-            onUpdateUser={handleUpdateUserInList}
-            onAddUser={handleAddUser}
-            onSwitchUser={handleSwitchUser}
-            onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
-          />
-        )}
+          {currentTab === 'users' && user.role === 'admin' && (
+            <UserManagementView
+              users={allUsers}
+              currentUser={user}
+              onUpdateUser={handleUpdateUserInList}
+              onAddUser={handleAddUser}
+              onSwitchUser={handleSwitchUser}
+              onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
+            />
+          )}
 
-        {currentTab === 'users' && user.role !== 'admin' && (
-          <DashboardView
-            user={user}
-            websites={userWebsites}
-            logs={auditLogs}
-            onStartSurfing={() => {
-              if (user.status === 'suspended') {
-                return;
-              }
-              setCurrentTab('autosurf');
-            }}
-            onOpenWebsites={() => setCurrentTab('websites')}
-            onOpenAntiCheat={() => setCurrentTab('anticheat')}
-            onOpenPricing={() => setPricingModalOpen(true)}
-            onOpenHelp={() => setCurrentTab('help')}
-          />
-        )}
+          {currentTab === 'users' && user.role !== 'admin' && (
+            <DashboardView
+              user={user}
+              websites={userWebsites}
+              logs={auditLogs}
+              onStartSurfing={handleOpenSurfing}
+              onOpenWebsites={() => setCurrentTab('websites')}
+              onOpenAntiCheat={() => setCurrentTab('anticheat')}
+              onOpenPricing={() => setPricingModalOpen(true)}
+              onOpenHelp={() => setCurrentTab('help')}
+            />
+          )}
 
-        {currentTab === 'help' && (
-          <HelpGuideView
-            user={user}
-            onStartSurfing={() => {
-              if (user.status === 'suspended') {
-                return;
-              }
-              setCurrentTab('autosurf');
-            }}
-            onOpenWebsites={() => setCurrentTab('websites')}
-            onOpenAntiCheat={() => setCurrentTab('anticheat')}
-            onOpenAudit={() => setCurrentTab('audit')}
-            onOpenReferral={() => setCurrentTab('referral')}
-            onOpenPricing={() => setPricingModalOpen(true)}
-          />
-        )}
+          {currentTab === 'help' && (
+            <HelpGuideView
+              user={user}
+              onStartSurfing={handleOpenSurfing}
+              onOpenWebsites={() => setCurrentTab('websites')}
+              onOpenAntiCheat={() => setCurrentTab('anticheat')}
+              onOpenAudit={() => setCurrentTab('audit')}
+              onOpenReferral={() => setCurrentTab('referral')}
+              onOpenPricing={() => setPricingModalOpen(true)}
+            />
+          )}
+        </Suspense>
       </main>
 
-      {/* User Profile & Admin Switcher Modal */}
-      <UserProfileModal
-        isOpen={profileModalOpen}
-        onClose={() => setProfileModalOpen(false)}
-        user={user}
-        allUsers={allUsers}
-        isLiveConnected={wpAuthService.isLiveBridgeActive()}
-        canReturnToAdmin={wpAuthService.hasAdminReturnToken()}
-        onUpdateProfile={handleUpdateCurrentUserData}
-        onSwitchUser={handleSwitchUser}
-        onReturnToAdmin={handleReturnToAdmin}
-        onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
-        onOpenHelp={() => setCurrentTab('help')}
-        onLogout={handleWordPressLogout}
-      />
+      {/* Lazy-Loaded Modals */}
+      <Suspense fallback={null}>
+        {profileModalOpen && (
+          <UserProfileModal
+            isOpen={profileModalOpen}
+            onClose={() => setProfileModalOpen(false)}
+            user={user}
+            allUsers={allUsers}
+            geoStatus={geoStatus}
+            isLiveConnected={wpAuthService.isLiveBridgeActive()}
+            canReturnToAdmin={wpAuthService.hasAdminReturnToken()}
+            onUpdateProfile={handleUpdateCurrentUserData}
+            onSwitchUser={handleSwitchUser}
+            onReturnToAdmin={handleReturnToAdmin}
+            onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
+            onOpenHelp={() => setCurrentTab('help')}
+            onLogout={handleWordPressLogout}
+          />
+        )}
 
-      {/* WordPress Authentication & Database Integration Modal */}
-      <WordPressAuthModal
-        isOpen={wpAuthModalOpen}
-        onClose={() => setWpAuthModalOpen(false)}
-        currentUser={user}
-        onWordPressLoginSuccess={handleWordPressLoginSuccess}
-        onWordPressLogout={handleWordPressLogout}
-      />
+        {wpAuthModalOpen && (
+          <WordPressAuthModal
+            isOpen={wpAuthModalOpen}
+            onClose={() => setWpAuthModalOpen(false)}
+            currentUser={user}
+            onWordPressLoginSuccess={handleWordPressLoginSuccess}
+            onWordPressLogout={handleWordPressLogout}
+          />
+        )}
 
-      {/* Pricing / Top Up Modal */}
-      <PricingModal
-        isOpen={pricingModalOpen}
-        onClose={() => setPricingModalOpen(false)}
-        user={user}
-        onAddUserPoints={handleAddUserPoints}
-        onUpgradeToVip={handleUpgradeToVip}
-      />
+        {pricingModalOpen && (
+          <PricingModal
+            isOpen={pricingModalOpen}
+            onClose={() => setPricingModalOpen(false)}
+            user={user}
+            onAddUserPoints={handleAddUserPoints}
+            onUpgradeToVip={handleUpgradeToVip}
+          />
+        )}
+      </Suspense>
 
       {/* Manual PoP Verification Modal */}
       <HumanVerificationModal

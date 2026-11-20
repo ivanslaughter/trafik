@@ -37,6 +37,7 @@ class AntiCheatEngine {
   private isSurfingActive: boolean = false;
   private isPaused: boolean = false;
   private lowEntropyAlertSent: boolean = false;
+  private externalSurfWindowActive: boolean = false;
 
   constructor() {
     this.currentSessionId = 'sess_' + Math.random().toString(36).substring(2, 9);
@@ -85,6 +86,7 @@ class AntiCheatEngine {
     this.isSurfingActive = false;
     this.isPaused = false;
     this.lowEntropyAlertSent = false;
+    this.externalSurfWindowActive = false;
     this.status.consecutiveLowEntropySeconds = 0;
     this.status.mouseEntropyScore = 85;
     this.status.concurrencyLockActive = false;
@@ -96,6 +98,19 @@ class AntiCheatEngine {
     this.isPaused = paused;
     if (!paused) {
       this.lowEntropyAlertSent = false;
+    }
+  }
+
+  public setExternalSurfWindowActive(active: boolean) {
+    this.externalSurfWindowActive = active;
+    if (active) {
+      this.status.tabFocused = true;
+      this.status.suspicionLevel = 'clean';
+      this.status.consecutiveLowEntropySeconds = 0;
+      this.lowEntropyAlertSent = false;
+      this.status.mouseEntropyScore = Math.max(this.status.mouseEntropyScore, 75);
+    } else if (typeof document !== 'undefined') {
+      this.status.tabFocused = document.visibilityState === 'visible';
     }
   }
 
@@ -124,6 +139,15 @@ class AntiCheatEngine {
 
   private handleVisibilityChange = () => {
     if (!this.isSurfingActive) return;
+
+    // When a RankBoostUp-style managed external surf window is open and alive,
+    // switching focus to view that external site is expected and must not pause the session.
+    if (this.externalSurfWindowActive) {
+      this.status.tabFocused = true;
+      this.status.suspicionLevel = 'clean';
+      return;
+    }
+
     const isVisible = document.visibilityState === 'visible';
     this.status.tabFocused = isVisible;
 
@@ -215,6 +239,14 @@ class AntiCheatEngine {
 
   private runPeriodicEntropyAudit() {
     if (!this.isSurfingActive || this.isPaused || !this.status.tabFocused) {
+      return;
+    }
+
+    // While user is browsing inside the managed RankBoostUp external window,
+    // mouse movements happen inside that external window rather than this control tab.
+    if (this.externalSurfWindowActive) {
+      this.status.mouseEntropyScore = Math.max(70, this.status.mouseEntropyScore);
+      this.status.consecutiveLowEntropySeconds = 0;
       return;
     }
 

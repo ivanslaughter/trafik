@@ -1,4 +1,4 @@
-import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, WebsiteProbeResult } from '../types';
+import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, WebsiteProbeResult, GeoStatus } from '../types';
 
 export type WordPressAuthMode = 'bridge' | 'simulated';
 
@@ -39,6 +39,7 @@ class WordPressAuthService {
   private config: WordPressConnectionConfig = DEFAULT_CONFIG;
   private token: string | null = null;
   private adminReturnToken: string | null = null;
+  private lastGeoStatus: GeoStatus | null = null;
 
   constructor() {
     if (typeof localStorage !== 'undefined') {
@@ -91,7 +92,7 @@ class WordPressAuthService {
     path: string,
     options: RequestInit = {},
     requireAuth = true
-  ): Promise<{ ok: boolean; status: number; data?: T; error?: string }> {
+  ): Promise<{ ok: boolean; status: number; data?: T; error?: string; code?: string; geoStatus?: GeoStatus }> {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
       Accept: 'application/json',
@@ -114,6 +115,8 @@ class WordPressAuthService {
           ok: false,
           status: res.status,
           error: json.message || `Error HTTP ${res.status}`,
+          code: json.code,
+          geoStatus: json.data?.geoStatus,
         };
       }
       return { ok: true, status: res.status, data: json as T };
@@ -126,13 +129,59 @@ class WordPressAuthService {
     }
   }
 
+  public getCachedGeoStatus(): GeoStatus | null {
+    return this.lastGeoStatus;
+  }
+
+  public async checkGeoAccess(forceRefresh = false): Promise<GeoStatus> {
+    if (
+      !forceRefresh &&
+      this.lastGeoStatus &&
+      this.lastGeoStatus.checkedAt &&
+      Date.now() - this.lastGeoStatus.checkedAt < 60_000
+    ) {
+      return this.lastGeoStatus;
+    }
+
+    if (this.config.authMode === 'simulated') {
+      const sim: GeoStatus = {
+        allowed: true,
+        countryCode: 'ID',
+        countryName: 'Indonesia (Mode Simulasi)',
+        isProxy: false,
+        adminBypass: false,
+        message: 'Koneksi Indonesia terverifikasi.',
+        checkedAt: Date.now(),
+      };
+      this.lastGeoStatus = sim;
+      return sim;
+    }
+
+    const res = await this.request<GeoStatus>('/geo/check', { method: 'GET' }, true);
+    if (res.ok && res.data) {
+      const status: GeoStatus = { ...res.data, checkedAt: Date.now() };
+      this.lastGeoStatus = status;
+      return status;
+    }
+
+    return {
+      allowed: true,
+      countryCode: 'ID',
+      countryName: 'Indonesia',
+      isProxy: false,
+      adminBypass: false,
+      message: res.error || 'Pemeriksaan wilayah dilewati sementara.',
+      checkedAt: Date.now(),
+    };
+  }
+
   /**
    * Login via WordPress Plugin Bridge (/wp-json/trafik/v1/auth/login)
    */
   public async loginWithWordPress(
     username: string,
     password: string
-  ): Promise<{ success: boolean; user?: UserProfile; message: string }> {
+  ): Promise<{ success: boolean; user?: UserProfile; geoStatus?: GeoStatus; geoBlocked?: boolean; message: string }> {
     if (this.config.authMode === 'simulated') {
       await new Promise((r) => setTimeout(r, 500));
 
@@ -170,7 +219,7 @@ class WordPressAuthService {
       };
     }
 
-    const res = await this.request<{ success: boolean; token: string; user: UserProfile }>(
+    const res = await this.request<{ success: boolean; token: string; user: UserProfile; geoStatus?: GeoStatus }>(
       '/auth/login',
       {
         method: 'POST',
@@ -180,13 +229,21 @@ class WordPressAuthService {
     );
 
     if (!res.ok || !res.data?.token) {
+      if (res.geoStatus) {
+        this.lastGeoStatus = { ...res.geoStatus, checkedAt: Date.now() };
+      }
       return {
         success: false,
+        geoBlocked: res.code === 'geo_blocked' || res.status === 403,
+        geoStatus: res.geoStatus,
         message: res.error || 'Gagal login ke WordPress Plugin Bridge.',
       };
     }
 
     this.token = res.data.token;
+    if (res.data.geoStatus) {
+      this.lastGeoStatus = { ...res.data.geoStatus, checkedAt: Date.now() };
+    }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('tn_wp_jwt_token', res.data.token);
     }
@@ -194,7 +251,10 @@ class WordPressAuthService {
     return {
       success: true,
       user: res.data.user,
-      message: 'Login WordPress berhasil! Data tersinkronisasi langsung dengan MySQL.',
+      geoStatus: res.data.geoStatus,
+      message: res.data.geoStatus?.adminBypass
+        ? 'Login Administrator berhasil (Geo-Bypass aktif).'
+        : 'Login WordPress berhasil! Data tersinkronisasi langsung dengan MySQL.',
     };
   }
 
@@ -206,7 +266,7 @@ class WordPressAuthService {
     email: string,
     password: string,
     city = 'Indonesia'
-  ): Promise<{ success: boolean; user?: UserProfile; message: string }> {
+  ): Promise<{ success: boolean; user?: UserProfile; geoStatus?: GeoStatus; geoBlocked?: boolean; message: string }> {
     if (this.config.authMode === 'simulated') {
       return {
         success: false,
@@ -214,7 +274,7 @@ class WordPressAuthService {
       };
     }
 
-    const res = await this.request<{ success: boolean; token: string; user: UserProfile }>(
+    const res = await this.request<{ success: boolean; token: string; user: UserProfile; geoStatus?: GeoStatus }>(
       '/auth/register',
       {
         method: 'POST',
@@ -224,13 +284,21 @@ class WordPressAuthService {
     );
 
     if (!res.ok || !res.data?.token) {
+      if (res.geoStatus) {
+        this.lastGeoStatus = { ...res.geoStatus, checkedAt: Date.now() };
+      }
       return {
         success: false,
+        geoBlocked: res.code === 'geo_blocked' || res.status === 403,
+        geoStatus: res.geoStatus,
         message: res.error || 'Gagal mendaftar akun ke WordPress.',
       };
     }
 
     this.token = res.data.token;
+    if (res.data.geoStatus) {
+      this.lastGeoStatus = { ...res.data.geoStatus, checkedAt: Date.now() };
+    }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('tn_wp_jwt_token', res.data.token);
     }
@@ -238,6 +306,7 @@ class WordPressAuthService {
     return {
       success: true,
       user: res.data.user,
+      geoStatus: res.data.geoStatus,
       message: 'Akun WordPress baru berhasil dibuat & tersinkronisasi dengan MySQL!',
     };
   }
@@ -300,8 +369,14 @@ class WordPressAuthService {
 
   public async fetchMe(): Promise<UserProfile | null> {
     if (!this.isLiveBridgeActive()) return null;
-    const res = await this.request<{ user: UserProfile }>('/me', { method: 'GET' });
-    return res.ok && res.data ? res.data.user : null;
+    const res = await this.request<{ user: UserProfile; geoStatus?: GeoStatus }>('/me', { method: 'GET' });
+    if (res.ok && res.data) {
+      if (res.data.geoStatus) {
+        this.lastGeoStatus = { ...res.data.geoStatus, checkedAt: Date.now() };
+      }
+      return res.data.user;
+    }
+    return null;
   }
 
   public async updateMe(payload: {
@@ -323,7 +398,7 @@ class WordPressAuthService {
     earnedPoints: number;
     cost: number;
     durationSec?: number;
-  }): Promise<{ user?: UserProfile; campaign?: WebsiteCampaign | null } | null> {
+  }): Promise<{ user?: UserProfile; campaign?: WebsiteCampaign | null; geoBlocked?: boolean; error?: string } | null> {
     if (!this.isLiveBridgeActive()) return null;
     const res = await this.request<{
       success: boolean;
@@ -333,7 +408,13 @@ class WordPressAuthService {
       method: 'POST',
       body: JSON.stringify(payload),
     });
-    return res.ok && res.data ? { user: res.data.user, campaign: res.data.campaign } : null;
+    if (!res.ok) {
+      return {
+        geoBlocked: res.code === 'geo_blocked' || res.status === 403,
+        error: res.error,
+      };
+    }
+    return res.data ? { user: res.data.user, campaign: res.data.campaign } : null;
   }
 
   public async fetchWebsites(): Promise<{
@@ -499,6 +580,7 @@ class WordPressAuthService {
   public logout() {
     this.token = null;
     this.adminReturnToken = null;
+    this.lastGeoStatus = null;
     if (typeof localStorage !== 'undefined') {
       localStorage.removeItem('tn_wp_jwt_token');
       localStorage.removeItem('tn_wp_admin_return_token');

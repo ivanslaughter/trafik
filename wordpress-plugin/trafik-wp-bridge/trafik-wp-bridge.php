@@ -3,7 +3,7 @@
  * Plugin Name: Trafik WP Bridge
  * Plugin URI: https://trafik.velocity.web.id
  * Description: Menjembatani aplikasi Trafik (React SPA) dengan database MySQL/MariaDB & autentikasi pengguna WordPress via REST API (/wp-json/trafik/v1).
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: Velocity Digital
  * Author URI: https://velocity.web.id
  * License: GPLv2 or later
@@ -14,8 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TRAFIK_BRIDGE_VERSION', '1.1.0');
-define('TRAFIK_BRIDGE_DB_VERSION', '1.1.0');
+define('TRAFIK_BRIDGE_VERSION', '1.2.0');
+define('TRAFIK_BRIDGE_DB_VERSION', '1.2.0');
 
 /**
  * 1. ACTIVATION & DATABASE SCHEMA (MySQL / MariaDB)
@@ -51,6 +51,7 @@ function trafik_bridge_install() {
         submitted_by_user_id bigint(20) unsigned NOT NULL DEFAULT 0,
         iframe_allowed tinyint(1) NOT NULL DEFAULT 1,
         referrer_policy varchar(16) NOT NULL DEFAULT 'direct',
+        utm_enabled tinyint(1) NOT NULL DEFAULT 0,
         preview_content longtext DEFAULT NULL,
         created_at date NOT NULL,
         PRIMARY KEY  (id),
@@ -79,6 +80,12 @@ function trafik_bridge_install() {
 
     if (get_option('trafik_bridge_allowed_origins') === false) {
         update_option('trafik_bridge_allowed_origins', "https://trafik.velocity.web.id\nhttps://velocity.web.id\n*");
+    }
+    if (get_option('trafik_bridge_geo_enforce') === false) {
+        update_option('trafik_bridge_geo_enforce', '1');
+    }
+    if (get_option('trafik_bridge_block_vpn') === false) {
+        update_option('trafik_bridge_block_vpn', '1');
     }
 }
 register_activation_hook(__FILE__, 'trafik_bridge_install');
@@ -334,6 +341,7 @@ function trafik_bridge_format_campaign($row) {
         'submittedByUserId'   => $row->submitted_by_user_id ? ('wp_' . (int) $row->submitted_by_user_id) : '',
         'iframeAllowed'       => isset($row->iframe_allowed) ? ((int) $row->iframe_allowed === 1) : true,
         'referrerPolicy'      => !empty($row->referrer_policy) ? $row->referrer_policy : 'direct',
+        'utmEnabled'          => isset($row->utm_enabled) ? ((int) $row->utm_enabled === 1) : false,
         'previewContent'      => $preview,
     ];
 }
@@ -604,6 +612,203 @@ function trafik_bridge_probe_website($url, $submitted_title = '') {
 }
 
 /**
+ * 4C. INDONESIA-ONLY GEO-GATE & VPN/PROXY DETECTION (WITH WP ADMIN BYPASS)
+ */
+function trafik_bridge_get_client_ip() {
+    $candidates = [
+        $_SERVER['HTTP_CF_CONNECTING_IP'] ?? '',
+        $_SERVER['HTTP_TRUE_CLIENT_IP'] ?? '',
+        $_SERVER['HTTP_X_REAL_IP'] ?? '',
+    ];
+
+    if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+        $parts = array_map('trim', explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']));
+        foreach ($parts as $p) {
+            $candidates[] = $p;
+        }
+    }
+    $candidates[] = $_SERVER['REMOTE_ADDR'] ?? '';
+
+    foreach ($candidates as $ip) {
+        if (!empty($ip) && filter_var($ip, FILTER_VALIDATE_IP)) {
+            return $ip;
+        }
+    }
+    return '';
+}
+
+function trafik_bridge_mask_ip($ip) {
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+        $segs = explode('.', $ip);
+        return $segs[0] . '.' . $segs[1] . '.*.*';
+    }
+    if (!empty($ip)) {
+        return substr($ip, 0, 8) . '::*';
+    }
+    return 'unknown';
+}
+
+function trafik_bridge_detect_geo($ip = null) {
+    $ip = $ip ?: trafik_bridge_get_client_ip();
+
+    // Private / loopback development environment
+    if (empty($ip) || !filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) {
+        return [
+            'countryCode' => 'ID',
+            'countryName' => 'Indonesia (Local)',
+            'isProxy'     => false,
+            'ipMasked'    => trafik_bridge_mask_ip($ip),
+            'source'      => 'local',
+        ];
+    }
+
+    // Fast path 1: Cloudflare edge header (zero external latency)
+    $cf_country = strtoupper(trim($_SERVER['HTTP_CF_IPCOUNTRY'] ?? ''));
+    if (strlen($cf_country) === 2 && $cf_country !== 'XX') {
+        if ($cf_country === 'T1') {
+            return [
+                'countryCode' => 'T1',
+                'countryName' => 'Tor Exit Node',
+                'isProxy'     => true,
+                'ipMasked'    => trafik_bridge_mask_ip($ip),
+                'source'      => 'cloudflare',
+            ];
+        }
+        // Only check proxy reputation cached when country is ID and VPN blocking enabled
+        $is_proxy = false;
+        if ($cf_country === 'ID' && get_option('trafik_bridge_block_vpn', '1') === '1') {
+            $cached_rep = get_transient('trafik_geo_rep_' . md5($ip));
+            if (is_array($cached_rep)) {
+                $is_proxy = !empty($cached_rep['isProxy']);
+            } else {
+                $rep_res = wp_remote_get("http://ip-api.com/json/{$ip}?fields=status,proxy,hosting", ['timeout' => 2.5]);
+                if (!is_wp_error($rep_res) && wp_remote_retrieve_response_code($rep_res) === 200) {
+                    $rep_json = json_decode(wp_remote_retrieve_body($rep_res), true);
+                    if (is_array($rep_json) && ($rep_json['status'] ?? '') === 'success') {
+                        $is_proxy = !empty($rep_json['proxy']) || !empty($rep_json['hosting']);
+                        set_transient('trafik_geo_rep_' . md5($ip), ['isProxy' => $is_proxy], 12 * HOUR_IN_SECONDS);
+                    }
+                }
+            }
+        }
+        return [
+            'countryCode' => $cf_country,
+            'countryName' => $cf_country === 'ID' ? 'Indonesia' : $cf_country,
+            'isProxy'     => $is_proxy,
+            'ipMasked'    => trafik_bridge_mask_ip($ip),
+            'source'      => 'cloudflare',
+        ];
+    }
+
+    // Fast path 2: Cached WP Transient GeoIP lookup (12h TTL)
+    $cache_key = 'trafik_geo_' . md5($ip);
+    $cached    = get_transient($cache_key);
+    if (is_array($cached) && !empty($cached['countryCode'])) {
+        return $cached;
+    }
+
+    $result = [
+        'countryCode' => 'UNKNOWN',
+        'countryName' => 'Tidak Diketahui',
+        'isProxy'     => false,
+        'ipMasked'    => trafik_bridge_mask_ip($ip),
+        'source'      => 'fallback',
+    ];
+
+    // Primary GeoIP lookup: ip-api.com (country + proxy/hosting detection)
+    $resp = wp_remote_get("http://ip-api.com/json/{$ip}?fields=status,country,countryCode,proxy,hosting", [
+        'timeout' => 3,
+    ]);
+    if (!is_wp_error($resp) && wp_remote_retrieve_response_code($resp) === 200) {
+        $data = json_decode(wp_remote_retrieve_body($resp), true);
+        if (is_array($data) && ($data['status'] ?? '') === 'success' && !empty($data['countryCode'])) {
+            $result = [
+                'countryCode' => strtoupper($data['countryCode']),
+                'countryName' => sanitize_text_field($data['country'] ?? $data['countryCode']),
+                'isProxy'     => !empty($data['proxy']) || !empty($data['hosting']),
+                'ipMasked'    => trafik_bridge_mask_ip($ip),
+                'source'      => 'ip-api',
+            ];
+            set_transient($cache_key, $result, 12 * HOUR_IN_SECONDS);
+            return $result;
+        }
+    }
+
+    // Secondary GeoIP lookup: ipinfo.io
+    $resp2 = wp_remote_get("https://ipinfo.io/{$ip}/json", ['timeout' => 2.5]);
+    if (!is_wp_error($resp2) && wp_remote_retrieve_response_code($resp2) === 200) {
+        $data2 = json_decode(wp_remote_retrieve_body($resp2), true);
+        if (is_array($data2) && !empty($data2['country'])) {
+            $cc = strtoupper(sanitize_text_field($data2['country']));
+            $result = [
+                'countryCode' => $cc,
+                'countryName' => $cc === 'ID' ? 'Indonesia' : $cc,
+                'isProxy'     => false,
+                'ipMasked'    => trafik_bridge_mask_ip($ip),
+                'source'      => 'ipinfo',
+            ];
+            set_transient($cache_key, $result, 12 * HOUR_IN_SECONDS);
+            return $result;
+        }
+    }
+
+    return $result;
+}
+
+function trafik_bridge_check_geo_access($wp_user = null) {
+    $geo          = trafik_bridge_detect_geo();
+    $enforce_id   = get_option('trafik_bridge_geo_enforce', '1') === '1';
+    $block_vpn    = get_option('trafik_bridge_block_vpn', '1') === '1';
+    $is_admin     = $wp_user && user_can($wp_user, 'manage_options');
+    $country_code = strtoupper($geo['countryCode'] ?? 'UNKNOWN');
+    $is_proxy     = !empty($geo['isProxy']);
+
+    $is_id_ip = ($country_code === 'ID');
+    $vpn_ok   = !$block_vpn || !$is_proxy;
+    $passed   = !$enforce_id || ($is_id_ip && $vpn_ok);
+
+    if ($is_admin && !$passed) {
+        return [
+            'allowed'     => true,
+            'countryCode' => $country_code,
+            'countryName' => $geo['countryName'],
+            'isProxy'     => $is_proxy,
+            'adminBypass' => true,
+            'ipMasked'    => $geo['ipMasked'],
+            'message'     => "Akses Admin Diizinkan (Bypass Geo-Gate dari {$country_code}).",
+        ];
+    }
+
+    if (!$passed) {
+        if ($is_proxy && $block_vpn) {
+            $msg = "Akses ditolak: Terdeteksi penggunaan VPN/Proxy atau server luar negeri ({$country_code}). Portal Trafik khusus untuk koneksi asli Indonesia. Matikan VPN Anda lalu coba lagi.";
+        } else {
+            $msg = "Akses ditolak: Portal Trafik khusus untuk pengguna di wilayah Indonesia (IP Anda terdeteksi dari {$geo['countryName']} / {$country_code}).";
+        }
+
+        return [
+            'allowed'     => false,
+            'countryCode' => $country_code,
+            'countryName' => $geo['countryName'],
+            'isProxy'     => $is_proxy,
+            'adminBypass' => false,
+            'ipMasked'    => $geo['ipMasked'],
+            'message'     => $msg,
+        ];
+    }
+
+    return [
+        'allowed'     => true,
+        'countryCode' => $country_code,
+        'countryName' => $geo['countryName'],
+        'isProxy'     => $is_proxy,
+        'adminBypass' => false,
+        'ipMasked'    => $geo['ipMasked'],
+        'message'     => 'Koneksi Indonesia terverifikasi.',
+    ];
+}
+
+/**
  * 5. REST API ROUTES (/wp-json/trafik/v1/...)
  */
 add_action('rest_api_init', function () {
@@ -638,7 +843,17 @@ add_action('rest_api_init', function () {
         },
     ]);
 
-    // Login via WordPress wp_users
+    // Geo-Gate Verification Endpoint (Indonesia-only check + Admin Bypass)
+    register_rest_route($ns, '/geo/check', [
+        'methods'             => 'GET',
+        'permission_callback' => '__return_true',
+        'callback'            => function (WP_REST_Request $request) {
+            $user = trafik_bridge_get_current_user($request);
+            return rest_ensure_response(trafik_bridge_check_geo_access($user));
+        },
+    ]);
+
+    // Login via WordPress wp_users (with Geo-Gate & Admin Bypass)
     register_rest_route($ns, '/auth/login', [
         'methods'             => 'POST',
         'permission_callback' => '__return_true',
@@ -663,22 +878,39 @@ add_action('rest_api_init', function () {
                 return new WP_Error('invalid_login', 'Username/Email atau Password WordPress salah.', ['status' => 401]);
             }
 
+            $geo = trafik_bridge_check_geo_access($user);
+            if (empty($geo['allowed'])) {
+                return new WP_Error('geo_blocked', $geo['message'], [
+                    'status'    => 403,
+                    'geoStatus' => $geo,
+                ]);
+            }
+
             update_user_meta($user->ID, 'tn_last_active', current_time('mysql'));
             $token = trafik_bridge_issue_token($user->ID);
 
             return rest_ensure_response([
-                'success' => true,
-                'token'   => $token,
-                'user'    => trafik_bridge_format_user($user),
+                'success'   => true,
+                'token'     => $token,
+                'user'      => trafik_bridge_format_user($user),
+                'geoStatus' => $geo,
             ]);
         },
     ]);
 
-    // Register new WordPress subscriber
+    // Register new WordPress subscriber (Strict Indonesia Geo-Gate)
     register_rest_route($ns, '/auth/register', [
         'methods'             => 'POST',
         'permission_callback' => '__return_true',
         'callback'            => function (WP_REST_Request $request) {
+            $geo = trafik_bridge_check_geo_access(null);
+            if (empty($geo['allowed'])) {
+                return new WP_Error('geo_blocked', $geo['message'], [
+                    'status'    => 403,
+                    'geoStatus' => $geo,
+                ]);
+            }
+
             $params   = $request->get_json_params() ?: $request->get_params();
             $name     = sanitize_text_field($params['name'] ?? '');
             $email    = sanitize_email($params['email'] ?? '');
@@ -715,9 +947,10 @@ add_action('rest_api_init', function () {
             $token = trafik_bridge_issue_token($user_id);
 
             return rest_ensure_response([
-                'success' => true,
-                'token'   => $token,
-                'user'    => trafik_bridge_format_user($wp_user),
+                'success'   => true,
+                'token'     => $token,
+                'user'      => trafik_bridge_format_user($wp_user),
+                'geoStatus' => $geo,
             ]);
         },
     ]);
@@ -730,7 +963,8 @@ add_action('rest_api_init', function () {
             'callback'            => function (WP_REST_Request $request) {
                 $user = trafik_bridge_get_current_user($request);
                 return rest_ensure_response([
-                    'user' => trafik_bridge_format_user($user),
+                    'user'      => trafik_bridge_format_user($user),
+                    'geoStatus' => trafik_bridge_check_geo_access($user),
                 ]);
             },
         ],
@@ -780,6 +1014,14 @@ add_action('rest_api_init', function () {
             $user   = trafik_bridge_get_current_user($request);
             $uid    = (int) $user->ID;
             $params = $request->get_json_params() ?: [];
+
+            $geo = trafik_bridge_check_geo_access($user);
+            if (empty($geo['allowed'])) {
+                return new WP_Error('geo_blocked', $geo['message'], [
+                    'status'    => 403,
+                    'geoStatus' => $geo,
+                ]);
+            }
 
             if (get_user_meta($uid, 'tn_status', true) === 'suspended') {
                 return new WP_Error('account_suspended', 'Akun Anda ditangguhkan oleh sistem Anti-Cheat.', ['status' => 403]);
@@ -923,6 +1165,7 @@ add_action('rest_api_init', function () {
 
                 $iframe_allowed  = isset($params['iframeAllowed']) ? ((bool) $params['iframeAllowed'] && (bool) $probe['iframeAllowed']) : (bool) $probe['iframeAllowed'];
                 $referrer_policy = ($params['referrerPolicy'] ?? 'direct') === 'referral' ? 'referral' : 'direct';
+                $utm_enabled     = !empty($params['utmEnabled']) ? 1 : 0;
 
                 $preview_content = $params['previewContent'] ?? null;
                 if (is_array($preview_content) && (!empty($probe['fetchedTitle']) || !empty($probe['fetchedDescription']))) {
@@ -960,6 +1203,7 @@ add_action('rest_api_init', function () {
                     'submitted_by_user_id'  => $uid,
                     'iframe_allowed'        => $iframe_allowed ? 1 : 0,
                     'referrer_policy'       => $referrer_policy,
+                    'utm_enabled'           => $utm_enabled,
                     'preview_content'       => $preview_content ? wp_json_encode($preview_content) : null,
                     'created_at'            => current_time('Y-m-d'),
                 ]);
@@ -1307,9 +1551,13 @@ function trafik_bridge_render_admin_page() {
     $notice          = '';
 
     if (isset($_POST['trafik_save_settings']) && check_admin_referer('trafik_bridge_settings_nonce')) {
-        $origins = sanitize_textarea_field($_POST['trafik_allowed_origins'] ?? '*');
+        $origins     = sanitize_textarea_field($_POST['trafik_allowed_origins'] ?? '*');
+        $geo_enforce = isset($_POST['trafik_geo_enforce']) ? '1' : '0';
+        $block_vpn   = isset($_POST['trafik_block_vpn']) ? '1' : '0';
         update_option('trafik_bridge_allowed_origins', $origins);
-        $notice = 'Pengaturan CORS Origins berhasil disimpan.';
+        update_option('trafik_bridge_geo_enforce', $geo_enforce);
+        update_option('trafik_bridge_block_vpn', $block_vpn);
+        $notice = 'Pengaturan CORS Origins & Geo-Gate Indonesia berhasil disimpan.';
     }
 
     if (isset($_POST['trafik_seed_campaigns']) && check_admin_referer('trafik_bridge_seed_nonce')) {
@@ -1710,10 +1958,13 @@ function trafik_bridge_render_admin_page() {
     $count_logs      = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_logs}");
     $count_seed      = (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table_campaigns} WHERE id LIKE %s", 'site_seed_%'));
     $allowed_origins = get_option('trafik_bridge_allowed_origins', "https://trafik.velocity.web.id\nhttps://velocity.web.id\n*");
+    $geo_enforce     = get_option('trafik_bridge_geo_enforce', '1') === '1';
+    $block_vpn       = get_option('trafik_bridge_block_vpn', '1') === '1';
+    $admin_geo       = trafik_bridge_check_geo_access(wp_get_current_user());
     $rest_base       = rest_url('trafik/v1');
     ?>
     <div class="wrap">
-        <h1>Trafik WP Bridge — Integrasi MySQL & REST API</h1>
+        <h1>Trafik WP Bridge — Integrasi MySQL, Geo-Gate Indonesia &amp; REST API</h1>
         <p>Plugin ini menghubungkan aplikasi <strong>Trafik</strong> (<code>https://trafik.velocity.web.id</code>) langsung ke database <strong>MySQL / MariaDB</strong> WordPress Anda.</p>
 
         <?php if ($notice): ?>
@@ -1721,14 +1972,14 @@ function trafik_bridge_render_admin_page() {
         <?php endif; ?>
 
         <div style="background:#fff;border:1px solid #ccd0d4;padding:16px 20px;max-width:820px;margin-top:16px;border-radius:6px;">
-            <h2 style="margin-top:0;">Status Database & Endpoint</h2>
+            <h2 style="margin-top:0;">Status Database, Geo-Gate &amp; Endpoint</h2>
             <table class="widefat striped" style="margin-bottom:16px;">
                 <tbody>
                     <tr><td><strong>REST API Endpoint</strong></td><td><code><?php echo esc_html($rest_base); ?></code></td></tr>
-                    <tr><td><strong>Health Check URL</strong></td><td><code><?php echo esc_html($rest_base . '/health'); ?></code></td></tr>
+                    <tr><td><strong>Geo-Gate Endpoint</strong></td><td><code><?php echo esc_html($rest_base . '/geo/check'); ?></code> (Terdeteksi: <strong><?php echo esc_html($admin_geo['countryCode']); ?></strong> · IP <code><?php echo esc_html($admin_geo['ipMasked']); ?></code><?php echo !empty($admin_geo['adminBypass']) ? ' · <em>Admin Bypass Aktif</em>' : ''; ?>)</td></tr>
                     <tr><td><strong>Tabel Kampanye Website</strong></td><td><code><?php echo esc_html($table_campaigns); ?></code> (<strong><?php echo esc_html($count_campaigns); ?></strong> total baris · <strong><?php echo esc_html($count_seed); ?></strong> baris mockup)</td></tr>
                     <tr><td><strong>Tabel Log Anti-Cheat</strong></td><td><code><?php echo esc_html($table_logs); ?></code> (<strong><?php echo esc_html($count_logs); ?></strong> baris)</td></tr>
-                    <tr><td><strong>Tabel Pengguna & Poin</strong></td><td><code><?php echo esc_html($wpdb->users); ?></code> &amp; <code><?php echo esc_html($wpdb->usermeta); ?></code></td></tr>
+                    <tr><td><strong>Tabel Pengguna &amp; Poin</strong></td><td><code><?php echo esc_html($wpdb->users); ?></code> &amp; <code><?php echo esc_html($wpdb->usermeta); ?></code></td></tr>
                 </tbody>
             </table>
 
@@ -1758,7 +2009,21 @@ function trafik_bridge_render_admin_page() {
 
             <form method="post">
                 <?php wp_nonce_field('trafik_bridge_settings_nonce'); ?>
-                <h3>Domain CORS yang Diizinkan (1 per baris)</h3>
+                <h3>Keamanan Geo-Gate Indonesia</h3>
+                <p>
+                    <label>
+                        <input type="checkbox" name="trafik_geo_enforce" value="1" <?php checked($geo_enforce); ?> />
+                        <strong>Wajibkan IP Indonesia</strong> untuk Pendaftaran, Login Member Non-Admin, dan Sesi Selancar (Administrator WordPress selalu dapat <em>bypass</em>).
+                    </label>
+                </p>
+                <p>
+                    <label>
+                        <input type="checkbox" name="trafik_block_vpn" value="1" <?php checked($block_vpn); ?> />
+                        <strong>Blokir Proxy / Hosting / VPN Luar Negeri</strong> untuk akun non-admin demi kemurnian trafik organik Indonesia.
+                    </label>
+                </p>
+
+                <h3 style="margin-top:16px;">Domain CORS yang Diizinkan (1 per baris)</h3>
                 <textarea name="trafik_allowed_origins" rows="4" class="large-text code"><?php echo esc_textarea($allowed_origins); ?></textarea>
                 <p class="description">Tambahkan domain frontend Trafik Anda (misal: <code>https://trafik.velocity.web.id</code>) atau biarkan <code>*</code> untuk mengizinkan preview &amp; subdomain.</p>
                 <p><button type="submit" name="trafik_save_settings" class="button button-primary">Simpan Pengaturan</button></p>

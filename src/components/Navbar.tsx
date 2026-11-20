@@ -106,7 +106,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 ? 'Hentikan sesi selancar dan kembali ke Dasbor'
                 : 'Mulai sesi Selancar Trafik'
             }
-            className={`flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-sm ${
+            className={`min-h-[40px] flex items-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap shadow-sm ${
               isSurfing
                 ? 'bg-amber-600 hover:bg-amber-500 text-white shadow-amber-900/30'
                 : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-900/30'
@@ -126,6 +126,31 @@ export const Navbar: React.FC<NavbarProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Compact Mobile Horizontal Scrollable Nav Strip (<lg viewports) */}
+      <nav
+        aria-label="Navigasi seluler"
+        className="lg:hidden border-t border-slate-800/80 bg-slate-950/95 px-3 overflow-x-auto no-scrollbar"
+      >
+        <div className="flex items-center gap-1.5 min-w-max py-1.5">
+          {navItems.map((item) => {
+            const isActive = currentTab === item.id;
+            return (
+              <button
+                key={item.id}
+                onClick={() => onSelectTab(item.id)}
+                className={`min-h-[38px] px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer ${
+                  isActive
+                    ? 'bg-emerald-600/20 text-emerald-300 border border-emerald-500/40 font-semibold'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
+                }`}
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </header>
   );
 };

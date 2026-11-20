@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ArrowRight,
   Check,
@@ -14,15 +14,16 @@ import {
   BarChart3,
   ChevronDown,
   BookOpen,
+  MapPin,
 } from 'lucide-react';
 import { APP_NAME, APP_CONFIG } from '../config/appConfig';
-import { UserProfile } from '../types';
+import { UserProfile, GeoStatus } from '../types';
 import { wpAuthService } from '../services/wordpressAuthService';
-import heroNetworkImg from '../assets/images/vel_hero_network_1795023164834.jpg';
-import regionalTargetingImg from '../assets/images/vel_regional_targeting_1795023164349.jpg';
-import anticheatGuardImg from '../assets/images/vel_anticheat_guard_1795023165931.jpg';
-import contentAuditImg from '../assets/images/vel_content_audit_1795023165678.jpg';
-import trafficRotationImg from '../assets/images/vel_traffic_rotation_1795023166516.jpg';
+import heroNetworkImg from '../assets/images/vel_hero_network_1795023164834.webp';
+import regionalTargetingImg from '../assets/images/vel_regional_targeting_1795023164349.webp';
+import anticheatGuardImg from '../assets/images/vel_anticheat_guard_1795023165931.webp';
+import contentAuditImg from '../assets/images/vel_content_audit_1795023165678.webp';
+import trafficRotationImg from '../assets/images/vel_traffic_rotation_1795023166516.webp';
 
 interface LandingPageProps {
   currentUser: UserProfile;
@@ -115,6 +116,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [geoStatus, setGeoStatus] = useState<GeoStatus | null>(wpAuthService.getCachedGeoStatus());
+
+  useEffect(() => {
+    if (wpAuthService.getConfig().authMode === 'bridge') {
+      wpAuthService.checkGeoAccess().then((status) => setGeoStatus(status));
+    }
+  }, []);
 
   const markImageFailed = (key: string) => {
     setFailedImages((prev) => ({ ...prev, [key]: true }));
@@ -158,6 +166,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           : await wpAuthService.loginWithWordPress(cleanEmail, password);
 
       setIsSubmitting(false);
+      if (res.geoStatus) {
+        setGeoStatus(res.geoStatus);
+      }
       if (!res.success || !res.user) {
         const sanitizedError = res.message
           .replace(/\b(WordPress|Plugin Bridge|wp_users|MySQL|MariaDB)\b/gi, '')
@@ -170,6 +181,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       setFormSuccess(
         entryMode === 'register'
           ? 'Pendaftaran berhasil! Mengarahkan Anda ke dasbor member...'
+          : res.geoStatus?.adminBypass
+          ? 'Login Administrator berhasil (Geo-Bypass aktif). Mengarahkan ke dasbor...'
           : 'Login berhasil! Mengarahkan Anda ke dasbor member...'
       );
       onAuthenticatedUser(res.user);
@@ -339,6 +352,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     src={heroNetworkImg}
                     alt="Ilustrasi jendela browser menampilkan peta jaringan pengunjung Indonesia dan perangkat terhubung"
                     referrerPolicy="no-referrer"
+                    decoding="async"
+                    fetchPriority="high"
                     onError={() => markImageFailed('hero')}
                     className="w-full h-full object-cover lg:h-full"
                   />
@@ -470,6 +485,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       src={regionalTargetingImg}
                       alt="Ilustrasi vektor penargetan geografis laptop dan ponsel ke pin lokasi"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
+                      decoding="async"
                       onError={() => markImageFailed('regional')}
                       className="w-full h-full object-cover"
                     />
@@ -493,6 +510,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     src={anticheatGuardImg}
                     alt="Ilustrasi perisai keamanan browser dan verifikasi interaksi pengguna"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
                     onError={() => markImageFailed('anticheat')}
                     className="w-full h-full object-cover"
                   />
@@ -541,6 +560,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     src={contentAuditImg}
                     alt="Ilustrasi gerbang pemindaian otomatis kepatuhan konten website"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
                     onError={() => markImageFailed('audit')}
                     className="w-full h-full object-cover"
                   />
@@ -607,6 +628,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       src={trafficRotationImg}
                       alt="Ilustrasi antrean rotasi halaman website dan grafik pertumbuhan kunjungan"
                       referrerPolicy="no-referrer"
+                      loading="lazy"
+                      decoding="async"
                       onError={() => markImageFailed('rotation')}
                       className="w-full h-full object-cover"
                     />
@@ -928,6 +951,19 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <span>Masuk Member Lama</span>
                   </button>
                 </div>
+
+                {geoStatus && !geoStatus.allowed && !geoStatus.adminBypass && (
+                  <div className="mb-4 p-3.5 rounded-lg border border-amber-500/40 bg-amber-950/35 text-amber-200 text-xs flex items-start gap-2.5">
+                    <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="leading-relaxed">
+                      <strong className="text-amber-100 block">Portal Khusus Pengguna Indonesia ({geoStatus.countryCode})</strong>
+                      <span>
+                        {geoStatus.message || 'Pendaftaran dan penggunaan member hanya tersedia dari koneksi IP Indonesia tanpa VPN luar negeri.'}{' '}
+                        {entryMode === 'login' ? 'Akun Administrator tetap dapat masuk via bypass.' : 'Gunakan tab Masuk jika Anda Administrator.'}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {formError && (
                   <div className="mb-4 p-3 rounded-lg border border-rose-500/50 bg-rose-950/50 text-rose-300 text-xs flex items-center gap-2">

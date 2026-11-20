@@ -42,6 +42,19 @@ export interface WebsiteProbeResult {
   compliance: AuditEvaluation;
 }
 
+export interface GeoStatus {
+  allowed: boolean;
+  countryCode: string;
+  countryName: string;
+  isProxy: boolean;
+  adminBypass: boolean;
+  ipMasked?: string;
+  message?: string;
+  checkedAt?: number;
+}
+
+export type SurfDeliveryMode = 'auto' | 'iframe' | 'window';
+
 export interface WebsiteCampaign {
   id: string;
   title: string;
@@ -58,8 +71,9 @@ export interface WebsiteCampaign {
   status: 'active' | 'paused' | 'depleted';
   createdAt: string;
   // Hybrid Surf & Analytics Fields
-  iframeAllowed?: boolean; // true = loads in live iframe; false = requires controlled surf tab fallback
+  iframeAllowed?: boolean; // true = loads in live iframe; false = requires controlled surf window fallback
   referrerPolicy?: 'direct' | 'referral'; // 'direct' sets no-referrer; 'referral' passes trafik.velocity.web.id
+  utmEnabled?: boolean; // optional GA4 utm_source/utm_medium tagging
   // Compliance & Anti-Judi/18+ Audit Fields
   auditStatus: WebsiteAuditStatus;
   auditScore: number; // 0 = 100% safe, 100 = critical violation

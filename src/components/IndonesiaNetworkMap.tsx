@@ -427,7 +427,7 @@ const STRATEGIC_RADAR_NODES: RadarNode[] = [
   { name: 'Semarang', province: 'Jawa Tengah', x: 547, y: 455, surfers: 185 },
   { name: 'Surabaya', province: 'Jawa Timur', x: 631, y: 470, surfers: 210 },
   { name: 'Denpasar', province: 'Bali', x: 717, y: 515, surfers: 75 },
-  { name: 'Pontianak', province: 'Kalimantan Barat', x: 505, y: 275, surfers: 28 },
+  { name: 'Pontianak', province: 'Kalimantan Barat', x: 515, y: 265, surfers: 28 },
   { name: 'Balikpapan', province: 'Kalimantan Timur', x: 773, y: 247, surfers: 42 },
   { name: 'Makassar', province: 'Sulawesi Selatan', x: 868, y: 393, surfers: 38 },
   { name: 'Manado', province: 'Sulawesi Utara', x: 1020, y: 140, surfers: 14 },

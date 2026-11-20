@@ -9,13 +9,14 @@ import {
   BookOpen,
   ShieldCheck,
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, GeoStatus } from '../types';
 
 interface UserProfileModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile;
   allUsers: UserProfile[];
+  geoStatus?: GeoStatus | null;
   isLiveConnected?: boolean;
   canReturnToAdmin?: boolean;
   onUpdateProfile: (updated: Partial<UserProfile>) => void;
@@ -31,6 +32,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onClose,
   user,
   allUsers,
+  geoStatus,
   isLiveConnected = false,
   canReturnToAdmin = false,
   onUpdateProfile,
@@ -94,6 +96,16 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
               {isAdmin && (
                 <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                   ADMIN
+                </span>
+              )}
+              {geoStatus?.adminBypass && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                  Geo-Bypass ({geoStatus.countryCode})
+                </span>
+              )}
+              {isLiveConnected && geoStatus && !geoStatus.adminBypass && geoStatus.allowed && (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-slate-800 text-emerald-300 border border-slate-700">
+                  IP {geoStatus.countryCode} ✓
                 </span>
               )}
             </div>
