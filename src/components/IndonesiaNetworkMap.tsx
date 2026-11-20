@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
 import {
   Globe,
@@ -14,14 +14,20 @@ import {
   Users,
   Eye,
   BarChart3,
-  Layers
+  Layers,
+  RefreshCw
 } from 'lucide-react';
 import { IndonesianRegionId } from '../types';
 import { INDONESIAN_REGIONS } from '../data/mockData';
+import { wpAuthService, NetworkMapStatsResponse } from '../services/wordpressAuthService';
 
 interface IndonesiaNetworkMapProps {
   onSelectRegion?: (regionId: IndonesianRegionId) => void;
   selectedRegion?: IndonesianRegionId;
+  liveNetworkStats?: NetworkMapStatsResponse | null;
+  isRefreshingLive?: boolean;
+  lastSyncedTime?: string;
+  onManualRefresh?: () => void;
 }
 
 export interface ProvinceTrafficStats {
@@ -443,6 +449,10 @@ const STRATEGIC_RADAR_NODES: RadarNode[] = [
 export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
   onSelectRegion,
   selectedRegion = 'nasional',
+  liveNetworkStats,
+  isRefreshingLive,
+  lastSyncedTime: externalLastSyncedTime,
+  onManualRefresh,
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapViewportRef = useRef<HTMLDivElement>(null);
@@ -450,10 +460,111 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
   const zoomBehaviorRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
 
   const [currentRegion, setCurrentRegion] = useState<IndonesianRegionId>(selectedRegion || 'nasional');
+  const [activeProvinceKey, setActiveProvinceKey] = useState<string | null>(null);
+  const [hoveredLeaderboardProvince, setHoveredLeaderboardProvince] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [metricMode, setMetricMode] = useState<'surfers' | 'hits' | 'quality'>('surfers');
   const [showRadar, setShowRadar] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [internalProvinceData, setInternalProvinceData] = useState<Record<string, ProvinceTrafficStats>>(
+    PROVINCE_TRAFFIC_DATA
+  );
+  const [internalLiveMysql, setInternalLiveMysql] = useState<boolean>(false);
+  const [internalRefreshing, setInternalRefreshing] = useState<boolean>(false);
+  const [internalSyncedTime, setInternalSyncedTime] = useState<string>('');
+
+  const isParentManagedFeed = typeof onManualRefresh === 'function';
+
+  // Merge helper converting WordPress Bridge response into 38-province map stats
+  const mergeLiveStats = useCallback((stats: NetworkMapStatsResponse): Record<string, ProvinceTrafficStats> => {
+    const merged: Record<string, ProvinceTrafficStats> = {};
+    const fallbackQuality = typeof stats.antiCheatBase === 'number' ? stats.antiCheatBase : 99.8;
+
+    for (const [provKey, meta] of Object.entries(PROVINCE_TRAFFIC_DATA)) {
+      const liveProv = stats.provinces?.[provKey];
+      merged[provKey] = {
+        ...meta,
+        surfers: liveProv ? liveProv.surfers : 0,
+        dailyHits: liveProv ? liveProv.dailyHits : 0,
+        antiCheatScore: liveProv ? liveProv.antiCheatScore : fallbackQuality,
+      };
+    }
+    return merged;
+  }, []);
+
+  const syncStandaloneNetworkStats = useCallback(async (forceFresh = false) => {
+    if (wpAuthService.getConfig().authMode !== 'bridge') {
+      setInternalLiveMysql(false);
+      return;
+    }
+
+    setInternalRefreshing(true);
+    try {
+      const stats = await wpAuthService.fetchNetworkMapStats(forceFresh);
+      if (stats && stats.source === 'mysql_live') {
+        setInternalProvinceData(mergeLiveStats(stats));
+        setInternalLiveMysql(true);
+        setInternalSyncedTime(
+          new Date().toLocaleTimeString('id-ID', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+          })
+        );
+      }
+    } finally {
+      setInternalRefreshing(false);
+    }
+  }, [mergeLiveStats]);
+
+  // Only run internal polling when mounted standalone (DashboardView manages unified 30s polling)
+  useEffect(() => {
+    if (isParentManagedFeed) return;
+
+    let active = true;
+    const poll = (fresh = false) => {
+      if (!active || document.visibilityState === 'hidden') return;
+      syncStandaloneNetworkStats(fresh);
+    };
+
+    poll(false);
+    const intervalId = window.setInterval(() => poll(false), 30_000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        poll(false);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isParentManagedFeed, syncStandaloneNetworkStats]);
+
+  // Unified live dataset derived from parent DashboardView polling or standalone fallback
+  const liveProvinceData = useMemo(() => {
+    if (liveNetworkStats && liveNetworkStats.source === 'mysql_live') {
+      return mergeLiveStats(liveNetworkStats);
+    }
+    return internalProvinceData;
+  }, [liveNetworkStats, mergeLiveStats, internalProvinceData]);
+
+  const isLiveMysqlFeed = Boolean(
+    (liveNetworkStats && liveNetworkStats.source === 'mysql_live') || internalLiveMysql
+  );
+  const isRefreshingFeed = isParentManagedFeed ? Boolean(isRefreshingLive) : internalRefreshing;
+  const lastSyncedTime = isParentManagedFeed ? (externalLastSyncedTime || '') : internalSyncedTime;
+
+  const handleTriggerRefresh = () => {
+    if (onManualRefresh) {
+      onManualRefresh();
+    } else {
+      syncStandaloneNetworkStats(true);
+    }
+  };
 
   // Sync internal state if selectedRegion prop changes externally
   useEffect(() => {
@@ -470,25 +581,30 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
     y: number;
   } | null>(null);
 
-  // Compute National Totals
-  const nationalTotals = useMemo(() => {
-    const list = Object.values(PROVINCE_TRAFFIC_DATA);
-    const surfers = list.reduce((a, b) => a + b.surfers, 0);
-    const hits = list.reduce((a, b) => a + b.dailyHits, 0);
-    return { surfers, hits, totalProvinces: list.length };
-  }, []);
+  // Compute Scope Totals dynamically (National or active Regional filter)
+  const activeScopeTotals = useMemo(() => {
+    const entries = Object.values(liveProvinceData);
+    const scoped =
+      currentRegion === 'nasional'
+        ? entries
+        : entries.filter((item) => item.regionId === currentRegion);
+    const surfers = scoped.reduce((a, b) => a + b.surfers, 0);
+    const hits = scoped.reduce((a, b) => a + b.dailyHits, 0);
+    return { surfers, hits, provinceCount: scoped.length };
+  }, [liveProvinceData, currentRegion]);
 
-  // Top 5 Provinces by current metric
+  // Interactive Top 5 Provinces filtered dynamically by currentRegion & ranked by metricMode
   const topProvinces = useMemo(() => {
-    const list = Object.values(PROVINCE_TRAFFIC_DATA);
-    return [...list]
+    return Object.entries(liveProvinceData)
+      .filter(([, stats]) => currentRegion === 'nasional' || stats.regionId === currentRegion)
+      .map(([key, stats]) => ({ key, ...stats }))
       .sort((a, b) => {
-        if (metricMode === 'hits') return b.dailyHits - a.dailyHits;
-        if (metricMode === 'quality') return b.antiCheatScore - a.antiCheatScore;
-        return b.surfers - a.surfers;
+        if (metricMode === 'hits') return b.dailyHits - a.dailyHits || b.surfers - a.surfers;
+        if (metricMode === 'quality') return b.antiCheatScore - a.antiCheatScore || b.surfers - a.surfers;
+        return b.surfers - a.surfers || b.dailyHits - a.dailyHits;
       })
       .slice(0, 5);
-  }, [metricMode]);
+  }, [liveProvinceData, metricMode, currentRegion]);
 
   // Load and initialize the SVG with D3
   useEffect(() => {
@@ -761,24 +877,28 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
     const svg = d3.select(svgMountRef.current).select('svg');
     if (svg.empty()) return;
 
-    // D3 Sequential Color Scales based on selected metric mode
-    const maxSurfers = 520;
-    const maxHits = 14500;
+    // Dynamic D3 Sequential Color Scales adapted to live MySQL peaks
+    const allStats = Object.values(liveProvinceData);
+    const maxSurfers = Math.max(10, ...allStats.map((s) => s.surfers));
+    const maxHits = Math.max(50, ...allStats.map((s) => s.dailyHits));
 
     const colorScaleSurfers = d3
       .scaleLinear<string>()
-      .domain([0, 15, 60, 150, 300, maxSurfers])
-      .range(['#1e293b', '#064e3b', '#047857', '#059669', '#10b981', '#34d399']);
+      .domain([0, maxSurfers * 0.04, maxSurfers * 0.14, maxSurfers * 0.35, maxSurfers * 0.65, maxSurfers])
+      .range(['#1e293b', '#064e3b', '#047857', '#059669', '#10b981', '#34d399'])
+      .clamp(true);
 
     const colorScaleHits = d3
       .scaleLinear<string>()
-      .domain([0, 500, 2000, 5000, 9000, maxHits])
-      .range(['#1e293b', '#0e7490', '#0891b2', '#06b6d4', '#22d3ee', '#67e8f9']);
+      .domain([0, maxHits * 0.04, maxHits * 0.14, maxHits * 0.35, maxHits * 0.65, maxHits])
+      .range(['#1e293b', '#0e7490', '#0891b2', '#06b6d4', '#22d3ee', '#67e8f9'])
+      .clamp(true);
 
     const colorScaleQuality = d3
       .scaleLinear<string>()
-      .domain([99.0, 99.4, 99.7, 100.0])
-      .range(['#1e293b', '#047857', '#10b981', '#4ade80']);
+      .domain([97.0, 99.0, 99.6, 100.0])
+      .range(['#1e293b', '#047857', '#10b981', '#4ade80'])
+      .clamp(true);
 
     const q = searchQuery.toLowerCase().trim();
 
@@ -789,24 +909,30 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
       const pathEl = d3.select(this);
       const province = pathEl.attr('data-province') || '';
       const regency = pathEl.attr('data-regency') || '';
-      const stats = PROVINCE_TRAFFIC_DATA[province];
+      const stats = liveProvinceData[province];
 
       const matchesSearch =
         q.length > 0 &&
         (regency.toLowerCase().includes(q) || province.toLowerCase().includes(q));
+      const isLeaderboardHovered =
+        Boolean(hoveredLeaderboardProvince) && province === hoveredLeaderboardProvince;
+      const isActiveProvince =
+        Boolean(activeProvinceKey) && province === activeProvinceKey;
 
       // Calculate fill color with D3
       let targetFill = '#1e293b';
 
       if (matchesSearch) {
         targetFill = '#f59e0b'; // Amber-500 highlight for search hits
+      } else if (isLeaderboardHovered) {
+        targetFill = '#06b6d4'; // Bright cyan spotlight when hovering Top 5 card
       } else if (stats) {
         if (metricMode === 'hits') {
-          targetFill = colorScaleHits(stats.dailyHits);
+          targetFill = stats.dailyHits > 0 ? colorScaleHits(stats.dailyHits) : '#1e293b';
         } else if (metricMode === 'quality') {
           targetFill = colorScaleQuality(stats.antiCheatScore);
         } else {
-          targetFill = colorScaleSurfers(stats.surfers);
+          targetFill = stats.surfers > 0 ? colorScaleSurfers(stats.surfers) : '#1e293b';
         }
       }
 
@@ -820,18 +946,25 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
         .attr('vector-effect', 'non-scaling-stroke')
         .style('vector-effect', 'non-scaling-stroke')
         .transition('fill-transition')
-        .duration(450)
+        .duration(isLeaderboardHovered ? 160 : 450)
         .ease(d3.easeCubicOut)
-        .style('fill', isRegionSelected ? targetFill : 'rgba(15, 23, 42, 0.85)')
+        .style('fill', isRegionSelected || isLeaderboardHovered ? targetFill : 'rgba(15, 23, 42, 0.85)')
         .style(
           'stroke',
           matchesSearch
             ? '#fef08a'
+            : isLeaderboardHovered
+            ? '#67e8f9'
+            : isActiveProvince
+            ? '#34d399'
             : isRegionSelected
             ? 'rgba(255, 255, 255, 0.35)'
             : 'rgba(51, 65, 85, 0.25)'
         )
-        .style('stroke-width', matchesSearch ? '1.4px' : '0.25px');
+        .style(
+          'stroke-width',
+          matchesSearch ? '1.4px' : isLeaderboardHovered ? '1.2px' : isActiveProvince ? '0.9px' : '0.25px'
+        );
 
       pathEl.style('cursor', 'pointer');
     });
@@ -866,7 +999,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
         posY = Math.max(pad, vpRect.height - tooltipHeight - pad);
       }
 
-      const stats = PROVINCE_TRAFFIC_DATA[province];
+      const stats = liveProvinceData[province];
       setHoveredData({
         province,
         regency,
@@ -906,7 +1039,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
         const pathEl = d3.select(this);
         const province = pathEl.attr('data-province') || '';
         const regency = pathEl.attr('data-regency') || '';
-        const stats = PROVINCE_TRAFFIC_DATA[province];
+        const stats = liveProvinceData[province];
 
         const matchesSearch =
           q.length > 0 &&
@@ -916,9 +1049,9 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
         if (matchesSearch) {
           originalFill = '#f59e0b';
         } else if (stats) {
-          if (metricMode === 'hits') originalFill = colorScaleHits(stats.dailyHits);
+          if (metricMode === 'hits') originalFill = stats.dailyHits > 0 ? colorScaleHits(stats.dailyHits) : '#1e293b';
           else if (metricMode === 'quality') originalFill = colorScaleQuality(stats.antiCheatScore);
-          else originalFill = colorScaleSurfers(stats.surfers);
+          else originalFill = stats.surfers > 0 ? colorScaleSurfers(stats.surfers) : '#1e293b';
         }
 
         const isRegionSelected =
@@ -946,34 +1079,35 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
       .on('click', function () {
         const pathEl = d3.select(this);
         const province = pathEl.attr('data-province') || '';
-        const stats = PROVINCE_TRAFFIC_DATA[province];
+        const stats = liveProvinceData[province];
 
         if (stats) {
           handleSelectProvince(province, stats.regionId);
         }
       });
 
-    // Update radar node highlights based on active region
+    // Update radar node highlights based on active region & live surfer activity
     svg.selectAll<SVGGElement, RadarNode>('.radar-node-item').each(function (d) {
       if (!d) return;
-      const stats = PROVINCE_TRAFFIC_DATA[d.province];
+      const stats = liveProvinceData[d.province];
       const isTargetRegion = currentRegion === 'nasional' || (stats && stats.regionId === currentRegion);
+      const hasActivity = !isLiveMysqlFeed || Boolean(stats && (stats.surfers > 0 || stats.dailyHits > 0));
 
       const nodeEl = d3.select(this);
       nodeEl.select('.radar-pulse-halo')
         .transition('halo-glow')
         .duration(450)
-        .style('opacity', isTargetRegion ? 1 : 0.15);
+        .style('opacity', isTargetRegion ? (hasActivity ? 1 : 0.35) : 0.15);
 
       nodeEl.select('.radar-center-circle')
         .transition('center-glow')
         .duration(450)
-        .attr('fill', isTargetRegion ? '#10B981' : '#047857');
+        .attr('fill', isTargetRegion && hasActivity ? '#10B981' : '#047857');
 
       nodeEl.select('.radar-city-label')
         .transition('label-glow')
         .duration(450)
-        .style('opacity', isTargetRegion ? 1 : 0.3);
+        .style('opacity', isTargetRegion ? (hasActivity ? 1 : 0.55) : 0.3);
     });
 
     // Backbone lines subtle dimming for non-active regions
@@ -984,7 +1118,18 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
 
     // Toggle Radar Layer Visibility
     svg.select('#d3-radar-layer').style('display', showRadar ? 'inline' : 'none');
-  }, [isLoading, metricMode, currentRegion, searchQuery, showRadar, onSelectRegion]);
+  }, [
+    isLoading,
+    metricMode,
+    currentRegion,
+    searchQuery,
+    showRadar,
+    onSelectRegion,
+    liveProvinceData,
+    isLiveMysqlFeed,
+    activeProvinceKey,
+    hoveredLeaderboardProvince,
+  ]);
 
   // Smoothly pan & zoom D3 map to targeted SVG coordinates & scale with natural flight path
   const zoomToTarget = (targetX: number, targetY: number, k: number) => {
@@ -1031,6 +1176,8 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
   // Zoom to designated Indonesian geographical region
   const handleSelectRegion = (regionId: IndonesianRegionId) => {
     setCurrentRegion(regionId);
+    setActiveProvinceKey(null);
+    setHoveredLeaderboardProvince(null);
     onSelectRegion?.(regionId);
     const target = REGION_BOUNDS[regionId] || REGION_BOUNDS.nasional;
     zoomToTarget(target.x, target.y, target.k);
@@ -1039,6 +1186,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
   // Zoom to designated Province
   const handleSelectProvince = (provName: string, regionId: IndonesianRegionId) => {
     setCurrentRegion(regionId);
+    setActiveProvinceKey(provName);
     onSelectRegion?.(regionId);
     const provCoord = PROVINCE_COORDINATES[provName];
     if (provCoord) {
@@ -1123,7 +1271,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           </div>
         </div>
 
-        {/* Global Traffic Counters */}
+        {/* Global / Active Region Traffic Counters */}
         <div className="flex items-center gap-4 text-xs bg-slate-950/80 px-3.5 py-2 rounded-xl border border-slate-800">
           <div className="flex items-center gap-2">
             <span className="relative flex h-2 w-2">
@@ -1131,9 +1279,11 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
               <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
             </span>
             <div>
-              <span className="text-slate-400 text-[11px] block">Surfer Online:</span>
+              <span className="text-slate-400 text-[11px] block">
+                {currentRegion === 'nasional' ? 'Surfer Online:' : `Surfer (${REGION_SHORT_LABELS[currentRegion]}):`}
+              </span>
               <span className="font-mono font-bold text-emerald-400 text-sm tabular-nums">
-                {nationalTotals.surfers.toLocaleString('id-ID')}
+                {activeScopeTotals.surfers.toLocaleString('id-ID')}
               </span>
             </div>
           </div>
@@ -1141,11 +1291,33 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           <div className="w-px h-6 bg-slate-800" />
 
           <div>
-            <span className="text-slate-400 text-[11px] block">Hits 24 Jam:</span>
+            <span className="text-slate-400 text-[11px] block">
+              {currentRegion === 'nasional' ? 'Hits 24 Jam:' : 'Hits Wilayah:'}
+            </span>
             <span className="font-mono font-bold text-cyan-400 text-sm tabular-nums">
-              {nationalTotals.hits.toLocaleString('id-ID')}
+              {activeScopeTotals.hits.toLocaleString('id-ID')}
             </span>
           </div>
+
+          {isLiveMysqlFeed && (
+            <>
+              <div className="w-px h-6 bg-slate-800 hidden sm:block" />
+              <button
+                type="button"
+                onClick={handleTriggerRefresh}
+                disabled={isRefreshingFeed}
+                title={
+                  lastSyncedTime
+                    ? `Data Real-Time MySQL (sinkron terakhir ${lastSyncedTime}). Klik untuk perbarui sekarang.`
+                    : 'Perbarui data langsung dari WordPress MySQL'
+                }
+                className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-emerald-300 hover:text-emerald-200 px-2 py-1 rounded-md bg-emerald-950/60 border border-emerald-800/50 cursor-pointer transition-colors disabled:opacity-60"
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshingFeed ? 'animate-spin' : ''}`} />
+                <span>MySQL Live</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -1348,66 +1520,131 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
           )}
         </div>
 
-        {/* Horizontal Top 5 Provinsi Teraktif Box Beneath Map */}
+        {/* Interactive Region-Aware Horizontal Top 5 Provinsi Teraktif Box Beneath Map */}
         <div className="rounded-xl border border-slate-800 bg-slate-950/60 p-4">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-800">
-            <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-              <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
-              Top 5 Provinsi Teraktif
-            </span>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+                <BarChart3 className="w-3.5 h-3.5 text-emerald-400" />
+                {currentRegion === 'nasional'
+                  ? 'Top 5 Provinsi Teraktif'
+                  : `Top ${topProvinces.length} Provinsi · ${REGION_SHORT_LABELS[currentRegion]}`}
+              </span>
+              {currentRegion !== 'nasional' && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectRegion('nasional')}
+                  className="text-[10px] font-medium text-emerald-300 hover:text-emerald-200 px-2 py-0.5 rounded bg-emerald-950/70 border border-emerald-800/50 transition-colors cursor-pointer"
+                >
+                  ← Semua Nusantara
+                </button>
+              )}
+            </div>
             <div className="flex items-center gap-3 text-[11px] text-slate-400">
               <span className="flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                 Presisi IP ISP Lokal
               </span>
               <span className="text-slate-700">·</span>
-              <span className="text-[10px] text-slate-500 font-mono">Live Ranking</span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {isLiveMysqlFeed
+                  ? `Live MySQL${lastSyncedTime ? ` · ${lastSyncedTime}` : ''}`
+                  : 'Live Ranking'}
+              </span>
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div
+            className={`mt-3 grid grid-cols-1 gap-3 ${
+              topProvinces.length === 1
+                ? 'sm:grid-cols-1'
+                : topProvinces.length === 2
+                ? 'sm:grid-cols-2'
+                : topProvinces.length === 3
+                ? 'sm:grid-cols-3'
+                : topProvinces.length === 4
+                ? 'sm:grid-cols-2 lg:grid-cols-4'
+                : 'sm:grid-cols-2 lg:grid-cols-5'
+            }`}
+          >
             {topProvinces.map((prov, idx) => {
-              const percent = Math.min(100, Math.round((prov.surfers / 520) * 100));
-              const isSelected = currentRegion === prov.regionId;
+              const peakValue =
+                metricMode === 'hits'
+                  ? Math.max(1, topProvinces[0]?.dailyHits || 1)
+                  : metricMode === 'quality'
+                  ? 100
+                  : Math.max(1, topProvinces[0]?.surfers || 1);
+              const currentValue =
+                metricMode === 'hits'
+                  ? prov.dailyHits
+                  : metricMode === 'quality'
+                  ? prov.antiCheatScore
+                  : prov.surfers;
+              const percent = Math.min(100, Math.round((currentValue / peakValue) * 100));
+              const isSelected = activeProvinceKey === prov.key;
+              const isRegionMatch = currentRegion !== 'nasional' && currentRegion === prov.regionId && !activeProvinceKey;
 
               return (
                 <div
-                  key={prov.name}
-                  onClick={() => handleSelectProvince(prov.name, prov.regionId)}
+                  key={prov.key}
+                  onClick={() => handleSelectProvince(prov.key, prov.regionId)}
+                  onMouseEnter={() => setHoveredLeaderboardProvince(prov.key)}
+                  onMouseLeave={() => setHoveredLeaderboardProvince(null)}
                   className={`p-3 rounded-lg border transition-all cursor-pointer flex flex-col justify-between ${
                     isSelected
-                      ? 'bg-emerald-950/70 border-emerald-600/60 shadow-sm'
-                      : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/50'
+                      ? 'bg-emerald-950/80 border-emerald-500/80 shadow-md shadow-emerald-950/40 ring-1 ring-emerald-400/30'
+                      : isRegionMatch
+                      ? 'bg-emerald-950/40 border-emerald-700/50 hover:bg-emerald-950/70'
+                      : 'bg-slate-900/60 border-slate-800/80 hover:bg-slate-800/60 hover:border-cyan-700/50'
                   }`}
                 >
                   <div>
                     <div className="flex items-center justify-between gap-1.5 text-xs">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="w-4 h-4 rounded-full bg-slate-800 text-slate-300 font-mono font-bold text-[10px] flex items-center justify-center shrink-0">
+                        <span
+                          className={`w-4 h-4 rounded-full font-mono font-bold text-[10px] flex items-center justify-center shrink-0 ${
+                            isSelected
+                              ? 'bg-emerald-500 text-slate-950'
+                              : 'bg-slate-800 text-slate-300'
+                          }`}
+                        >
                           {idx + 1}
                         </span>
-                        <span className="font-medium text-slate-200 truncate">{prov.name}</span>
+                        <span className="font-medium text-slate-100 truncate">{prov.name}</span>
                       </div>
-                      <span className="font-mono font-bold text-emerald-400 text-[11px] tabular-nums shrink-0">
+                      <span
+                        className={`font-mono font-bold text-[11px] tabular-nums shrink-0 ${
+                          metricMode === 'hits' ? 'text-cyan-400' : 'text-emerald-400'
+                        }`}
+                      >
                         {metricMode === 'hits'
                           ? `${prov.dailyHits.toLocaleString('id-ID')} hits`
                           : metricMode === 'quality'
                           ? `${prov.antiCheatScore}%`
-                          : `${prov.surfers}`}
+                          : `${prov.surfers.toLocaleString('id-ID')}`}
                       </span>
                     </div>
 
                     {/* Progress track */}
                     <div className="w-full h-1.5 rounded-full bg-slate-800 overflow-hidden mt-2">
                       <div
-                        className="h-full bg-emerald-500 rounded-full transition-all duration-500"
+                        className={`h-full rounded-full transition-all duration-500 ${
+                          metricMode === 'hits' ? 'bg-cyan-500' : 'bg-emerald-500'
+                        }`}
                         style={{ width: `${percent}%` }}
                       />
                     </div>
                   </div>
 
-                  <div className="text-[10px] text-slate-500 mt-2 truncate">
-                    Hub: {prov.topCities.slice(0, 3).join(', ')}
+                  <div className="mt-2 flex items-center justify-between gap-2 text-[10px]">
+                    <span className="text-slate-500 truncate">
+                      Hub: {prov.topCities.slice(0, 2).join(', ')}
+                    </span>
+                    <span className="text-slate-400 font-mono tabular-nums shrink-0">
+                      {metricMode === 'hits'
+                        ? `${prov.surfers} online`
+                        : `${prov.dailyHits.toLocaleString('id-ID')} hits`}
+                    </span>
                   </div>
                 </div>
               );

@@ -946,6 +946,7 @@ export default function App() {
               onOpenAntiCheat={() => setCurrentTab('anticheat')}
               onOpenPricing={() => setPricingModalOpen(true)}
               onOpenHelp={() => setCurrentTab('help')}
+              onRefreshDashboardData={syncFromWordPressBridge}
             />
           )}
 
@@ -1014,6 +1015,7 @@ export default function App() {
               onOpenAntiCheat={() => setCurrentTab('anticheat')}
               onOpenPricing={() => setPricingModalOpen(true)}
               onOpenHelp={() => setCurrentTab('help')}
+              onRefreshDashboardData={syncFromWordPressBridge}
             />
           )}
 

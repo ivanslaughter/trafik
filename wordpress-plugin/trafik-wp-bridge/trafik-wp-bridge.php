@@ -3,7 +3,7 @@
  * Plugin Name: Trafik WP Bridge
  * Plugin URI: https://trafik.velocity.web.id
  * Description: Menjembatani aplikasi Trafik (React SPA) dengan database MySQL/MariaDB & autentikasi pengguna WordPress via REST API (/wp-json/trafik/v1).
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: Velocity Digital
  * Author URI: https://velocity.web.id
  * License: GPLv2 or later
@@ -14,8 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TRAFIK_BRIDGE_VERSION', '1.2.0');
-define('TRAFIK_BRIDGE_DB_VERSION', '1.2.0');
+define('TRAFIK_BRIDGE_VERSION', '1.3.0');
+define('TRAFIK_BRIDGE_DB_VERSION', '1.3.0');
 
 /**
  * 1. ACTIVATION & DATABASE SCHEMA (MySQL / MariaDB)
@@ -27,6 +27,7 @@ function trafik_bridge_install() {
     $charset_collate = $wpdb->get_charset_collate();
     $table_campaigns = $wpdb->prefix . 'trafik_campaigns';
     $table_logs      = $wpdb->prefix . 'trafik_anticheat_logs';
+    $table_events    = $wpdb->prefix . 'trafik_surf_events';
 
     $sql_campaigns = "CREATE TABLE {$table_campaigns} (
         id varchar(64) NOT NULL,
@@ -73,8 +74,22 @@ function trafik_bridge_install() {
         KEY idx_user_created (user_id, created_at)
     ) {$charset_collate};";
 
+    $sql_events = "CREATE TABLE {$table_events} (
+        id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+        user_id bigint(20) unsigned NOT NULL DEFAULT 0,
+        campaign_id varchar(64) NOT NULL DEFAULT '',
+        province varchar(64) NOT NULL DEFAULT 'DKI Jakarta',
+        city varchar(64) NOT NULL DEFAULT '',
+        duration_sec int(11) NOT NULL DEFAULT 30,
+        created_at datetime NOT NULL,
+        PRIMARY KEY  (id),
+        KEY idx_created_prov (created_at, province),
+        KEY idx_user_created (user_id, created_at)
+    ) {$charset_collate};";
+
     dbDelta($sql_campaigns);
     dbDelta($sql_logs);
+    dbDelta($sql_events);
 
     update_option('trafik_bridge_db_version', TRAFIK_BRIDGE_DB_VERSION);
 
@@ -694,6 +709,8 @@ function trafik_bridge_detect_geo($ip = null) {
         return [
             'countryCode' => $cf_country,
             'countryName' => $cf_country === 'ID' ? 'Indonesia' : $cf_country,
+            'regionName'  => sanitize_text_field($_SERVER['HTTP_CF_REGION'] ?? ''),
+            'city'        => sanitize_text_field($_SERVER['HTTP_CF_IPCITY'] ?? ''),
             'isProxy'     => $is_proxy,
             'ipMasked'    => trafik_bridge_mask_ip($ip),
             'source'      => 'cloudflare',
@@ -710,13 +727,15 @@ function trafik_bridge_detect_geo($ip = null) {
     $result = [
         'countryCode' => 'UNKNOWN',
         'countryName' => 'Tidak Diketahui',
+        'regionName'  => '',
+        'city'        => '',
         'isProxy'     => false,
         'ipMasked'    => trafik_bridge_mask_ip($ip),
         'source'      => 'fallback',
     ];
 
-    // Primary GeoIP lookup: ip-api.com (country + proxy/hosting detection)
-    $resp = wp_remote_get("http://ip-api.com/json/{$ip}?fields=status,country,countryCode,proxy,hosting", [
+    // Primary GeoIP lookup: ip-api.com (country + region/city + proxy/hosting detection)
+    $resp = wp_remote_get("http://ip-api.com/json/{$ip}?fields=status,country,countryCode,regionName,city,proxy,hosting", [
         'timeout' => 3,
     ]);
     if (!is_wp_error($resp) && wp_remote_retrieve_response_code($resp) === 200) {
@@ -725,6 +744,8 @@ function trafik_bridge_detect_geo($ip = null) {
             $result = [
                 'countryCode' => strtoupper($data['countryCode']),
                 'countryName' => sanitize_text_field($data['country'] ?? $data['countryCode']),
+                'regionName'  => sanitize_text_field($data['regionName'] ?? ''),
+                'city'        => sanitize_text_field($data['city'] ?? ''),
                 'isProxy'     => !empty($data['proxy']) || !empty($data['hosting']),
                 'ipMasked'    => trafik_bridge_mask_ip($ip),
                 'source'      => 'ip-api',
@@ -743,6 +764,8 @@ function trafik_bridge_detect_geo($ip = null) {
             $result = [
                 'countryCode' => $cc,
                 'countryName' => $cc === 'ID' ? 'Indonesia' : $cc,
+                'regionName'  => sanitize_text_field($data2['region'] ?? ''),
+                'city'        => sanitize_text_field($data2['city'] ?? ''),
                 'isProxy'     => false,
                 'ipMasked'    => trafik_bridge_mask_ip($ip),
                 'source'      => 'ipinfo',
@@ -753,6 +776,80 @@ function trafik_bridge_detect_geo($ip = null) {
     }
 
     return $result;
+}
+
+/**
+ * Resolves an Indonesian city, English GeoIP region, or province string to one of the 38 official SVG data-province keys.
+ */
+function trafik_bridge_resolve_province($city = '', $region = '') {
+    $raw = strtolower(trim($city . ' ' . $region));
+    if (empty($raw) || $raw === 'indonesia') {
+        return 'DKI Jakarta';
+    }
+
+    $map = [
+        'Papua Barat Daya'           => ['papua barat daya', 'southwest papua', 'sorong', 'raja ampat', 'tambrauw', 'maybrat'],
+        'Papua Tengah'               => ['papua tengah', 'central papua', 'timika', 'mimika', 'nabire', 'paniai', 'puncak jaya'],
+        'Papua Pegunungan'           => ['papua pegunungan', 'highland papua', 'wamena', 'jayawijaya', 'yahukimo', 'tolikara'],
+        'Papua Selatan'              => ['papua selatan', 'south papua', 'merauke', 'asmat', 'mappi', 'boven digoel'],
+        'Papua Barat'                => ['papua barat', 'west papua', 'manokwari', 'fakfak', 'kaimana', 'bintuni'],
+        'Papua'                      => ['papua', 'jayapura', 'biak', 'sarmi', 'keerom', 'yapen'],
+        'Maluku Utara'               => ['maluku utara', 'north maluku', 'ternate', 'tidore', 'halmahera'],
+        'Maluku'                     => ['maluku', 'ambon', 'tual', 'seram', 'banda'],
+        'Sulawesi Utara'             => ['sulawesi utara', 'north sulawesi', 'manado', 'bitung', 'tomohon', 'minahasa'],
+        'Gorontalo'                  => ['gorontalo', 'limboto', 'bone bolango'],
+        'Sulawesi Tengah'            => ['sulawesi tengah', 'central sulawesi', 'palu', 'luwuk', 'poso', 'morowali'],
+        'Sulawesi Barat'             => ['sulawesi barat', 'west sulawesi', 'mamuju', 'majene', 'polewali'],
+        'Sulawesi Tenggara'          => ['sulawesi tenggara', 'southeast sulawesi', 'kendari', 'baubau', 'kolaka', 'wakatobi'],
+        'Sulawesi Selatan'           => ['sulawesi selatan', 'south sulawesi', 'makassar', 'gowa', 'maros', 'palopo', 'parepare'],
+        'Kalimantan Utara'           => ['kalimantan utara', 'north kalimantan', 'tarakan', 'tanjung selor', 'nunukan', 'malinau'],
+        'Kalimantan Timur'           => ['kalimantan timur', 'east kalimantan', 'balikpapan', 'samarinda', 'bontang', 'kutai', 'nusantara', 'ikn'],
+        'Kalimantan Selatan'         => ['kalimantan selatan', 'south kalimantan', 'banjarmasin', 'banjarbaru', 'martapura', 'tabalong'],
+        'Kalimantan Tengah'          => ['kalimantan tengah', 'central kalimantan', 'palangkaraya', 'palangka raya', 'sampit', 'kotawaringin'],
+        'Kalimantan Barat'           => ['kalimantan barat', 'west kalimantan', 'pontianak', 'singkawang', 'kubu raya', 'sambas', 'ketapang'],
+        'Nusa Tenggara Timur'        => ['nusa tenggara timur', 'east nusa tenggara', 'kupang', 'labuan bajo', 'flores', 'ende', 'maumere', 'sumba'],
+        'Nusa Tenggara Barat'        => ['nusa tenggara barat', 'west nusa tenggara', 'mataram', 'lombok', 'sumbawa', 'bima'],
+        'Bali'                       => ['bali', 'denpasar', 'badung', 'gianyar', 'kuta', 'ubud', 'singaraja', 'buleleng', 'tabanan'],
+        'Daerah Istimewa Yogyakarta' => ['yogyakarta', 'jogja', 'yogya', 'sleman', 'bantul', 'gunungkidul', 'kulon progo'],
+        'Jawa Timur'                 => ['jawa timur', 'east java', 'surabaya', 'malang', 'sidoarjo', 'kediri', 'gresik', 'jember', 'madiun', 'banyuwangi', 'mojokerto', 'pasuruan', 'blitar'],
+        'Jawa Tengah'                => ['jawa tengah', 'central java', 'semarang', 'solo', 'surakarta', 'magelang', 'tegal', 'pekalongan', 'purwokerto', 'salatiga', 'cilacap', 'kudus', 'klaten'],
+        'Banten'                     => ['banten', 'tangerang', 'serang', 'cilegon', 'lebak', 'pandeglang', 'bsd', 'bintaro'],
+        'Jawa Barat'                 => ['jawa barat', 'west java', 'bandung', 'bekasi', 'depok', 'bogor', 'cirebon', 'cimahi', 'karawang', 'tasikmalaya', 'sukabumi', 'garut', 'purwakarta', 'cikarang'],
+        'DKI Jakarta'                => ['jakarta', 'dki', 'jabodetabek', 'kemang', 'senayan', 'sudirman'],
+        'Lampung'                    => ['lampung', 'bandar lampung', 'metro'],
+        'Kepulauan Bangka Belitung'  => ['bangka', 'belitung', 'pangkalpinang', 'tanjung pandan'],
+        'Bengkulu'                   => ['bengkulu', 'rejang lebong'],
+        'Sumatera Selatan'           => ['sumatera selatan', 'south sumatra', 'palembang', 'prabumulih', 'lubuklinggau', 'lahat'],
+        'Jambi'                      => ['jambi', 'sungai penuh', 'muaro jambi'],
+        'Kepulauan Riau'             => ['kepulauan riau', 'riau islands', 'batam', 'tanjungpinang', 'bintan', 'karimun'],
+        'Riau'                       => ['riau', 'pekanbaru', 'dumai', 'kampar', 'siak'],
+        'Sumatera Barat'             => ['sumatera barat', 'west sumatra', 'padang', 'bukittinggi', 'payakumbuh', 'pariaman', 'solok'],
+        'Sumatera Utara'             => ['sumatera utara', 'north sumatra', 'medan', 'binjai', 'pematangsiantar', 'deli serdang', 'tebing tinggi', 'sibolga'],
+        'Aceh'                       => ['aceh', 'banda aceh', 'lhokseumawe', 'langsa', 'sabang', 'meulaboh'],
+    ];
+
+    foreach ($map as $province => $keywords) {
+        foreach ($keywords as $kw) {
+            if (strpos($raw, $kw) !== false) {
+                return $province;
+            }
+        }
+    }
+
+    return 'DKI Jakarta';
+}
+
+function trafik_bridge_touch_user_presence($user) {
+    if (!$user || empty($user->ID)) {
+        return;
+    }
+    $uid = (int) $user->ID;
+    update_user_meta($uid, 'tn_last_active', current_time('mysql'));
+
+    $geo  = trafik_bridge_detect_geo();
+    $city = (string) get_user_meta($uid, 'tn_city', true);
+    $prov = trafik_bridge_resolve_province($city !== 'Indonesia' ? $city : ($geo['city'] ?? ''), $geo['regionName'] ?? '');
+    update_user_meta($uid, 'tn_last_province', $prov);
 }
 
 function trafik_bridge_check_geo_access($wp_user = null) {
@@ -962,6 +1059,7 @@ add_action('rest_api_init', function () {
             'permission_callback' => 'trafik_bridge_permission_user',
             'callback'            => function (WP_REST_Request $request) {
                 $user = trafik_bridge_get_current_user($request);
+                trafik_bridge_touch_user_presence($user);
                 return rest_ensure_response([
                     'user'      => trafik_bridge_format_user($user),
                     'geoStatus' => trafik_bridge_check_geo_access($user),
@@ -983,7 +1081,9 @@ add_action('rest_api_init', function () {
                     ]);
                 }
                 if (isset($params['city'])) {
-                    update_user_meta($uid, 'tn_city', sanitize_text_field($params['city']));
+                    $new_city = sanitize_text_field($params['city']);
+                    update_user_meta($uid, 'tn_city', $new_city);
+                    update_user_meta($uid, 'tn_last_province', trafik_bridge_resolve_province($new_city));
                 }
                 if (!empty($params['addPoints'])) {
                     $delta = max(0, floatval($params['addPoints']));
@@ -996,7 +1096,8 @@ add_action('rest_api_init', function () {
                     update_user_meta($uid, 'tn_website_slots', 20);
                 }
 
-                update_user_meta($uid, 'tn_last_active', current_time('mysql'));
+                trafik_bridge_touch_user_presence($user);
+                delete_transient('trafik_network_stats_cache');
                 $fresh_user = get_user_by('id', $uid);
                 return rest_ensure_response([
                     'user' => trafik_bridge_format_user($fresh_user),
@@ -1005,7 +1106,179 @@ add_action('rest_api_init', function () {
         ],
     ]);
 
-    // Atomic Surf Completion (Credit surfer + Deduct campaign)
+    // Real-Time Network Distribution Map Stats aggregated from MySQL (GET /network/stats)
+    register_rest_route($ns, '/network/stats', [
+        'methods'             => 'GET',
+        'permission_callback' => '__return_true',
+        'callback'            => function (WP_REST_Request $request) {
+            global $wpdb;
+
+            $current_user = trafik_bridge_get_current_user($request);
+            if ($current_user) {
+                trafik_bridge_touch_user_presence($current_user);
+            }
+
+            $fresh = $request->get_param('fresh') === '1';
+            $cache_key = 'trafik_network_stats_cache';
+            if (!$fresh) {
+                $cached = get_transient($cache_key);
+                if (is_array($cached)) {
+                    return rest_ensure_response($cached);
+                }
+            }
+
+            $table_events    = $wpdb->prefix . 'trafik_surf_events';
+            $table_campaigns = $wpdb->prefix . 'trafik_campaigns';
+            $table_logs      = $wpdb->prefix . 'trafik_anticheat_logs';
+            $table_usermeta  = $wpdb->usermeta;
+
+            $now_mysql       = current_time('mysql');
+            $cutoff_15m      = gmdate('Y-m-d H:i:s', strtotime($now_mysql) - (15 * 60));
+            $cutoff_24h      = gmdate('Y-m-d H:i:s', strtotime($now_mysql) - (24 * 3600));
+            $cutoff_24h_ms   = (time() - (24 * 3600)) * 1000;
+
+            $provinces = [];
+
+            // 1. Online surfers per province (users active in last 15 minutes via tn_last_active)
+            $active_user_rows = $wpdb->get_results($wpdb->prepare(
+                "SELECT um_active.user_id,
+                        um_prov.meta_value AS last_province,
+                        um_city.meta_value AS user_city
+                 FROM {$table_usermeta} um_active
+                 LEFT JOIN {$table_usermeta} um_prov
+                   ON um_prov.user_id = um_active.user_id AND um_prov.meta_key = 'tn_last_province'
+                 LEFT JOIN {$table_usermeta} um_city
+                   ON um_city.user_id = um_active.user_id AND um_city.meta_key = 'tn_city'
+                 WHERE um_active.meta_key = 'tn_last_active'
+                   AND um_active.meta_value >= %s",
+                $cutoff_15m
+            ));
+
+            $online_user_ids = [];
+            if (is_array($active_user_rows)) {
+                foreach ($active_user_rows as $u_row) {
+                    $uid_int = (int) $u_row->user_id;
+                    if (isset($online_user_ids[$uid_int])) {
+                        continue;
+                    }
+                    $online_user_ids[$uid_int] = true;
+                    $prov = !empty($u_row->last_province)
+                        ? (string) $u_row->last_province
+                        : trafik_bridge_resolve_province((string) ($u_row->user_city ?? ''));
+                    if (!isset($provinces[$prov])) {
+                        $provinces[$prov] = ['surfers' => 0, 'dailyHits' => 0, 'antiCheatScore' => 99.8];
+                    }
+                    $provinces[$prov]['surfers'] += 1;
+                }
+            }
+
+            // 2. 24-hour surf hits & recent 15m active surfers from wp_trafik_surf_events
+            $events_table_exists = $wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $table_events)) === $table_events;
+            $event_hits_total    = 0;
+
+            if ($events_table_exists) {
+                $hit_rows = $wpdb->get_results($wpdb->prepare(
+                    "SELECT province,
+                            COUNT(*) AS hits_24h,
+                            COUNT(DISTINCT CASE WHEN created_at >= %s THEN user_id ELSE NULL END) AS active_15m
+                     FROM {$table_events}
+                     WHERE created_at >= %s
+                     GROUP BY province",
+                    $cutoff_15m,
+                    $cutoff_24h
+                ));
+
+                if (is_array($hit_rows)) {
+                    foreach ($hit_rows as $h_row) {
+                        $prov = !empty($h_row->province) ? (string) $h_row->province : 'DKI Jakarta';
+                        $hits = (int) $h_row->hits_24h;
+                        $act  = (int) $h_row->active_15m;
+                        $event_hits_total += $hits;
+
+                        if (!isset($provinces[$prov])) {
+                            $provinces[$prov] = ['surfers' => 0, 'dailyHits' => 0, 'antiCheatScore' => 99.8];
+                        }
+                        $provinces[$prov]['dailyHits'] += $hits;
+                        if ($act > $provinces[$prov]['surfers']) {
+                            $provinces[$prov]['surfers'] = $act;
+                        }
+                    }
+                }
+            }
+
+            // 3. Fallback baseline from today's delivered campaign hits if surf_events has no rows yet
+            $region_primary_province = [
+                'nasional'    => 'DKI Jakarta',
+                'jabodetabek' => 'DKI Jakarta',
+                'jawa_barat'  => 'Jawa Barat',
+                'jawa_tengah' => 'Jawa Tengah',
+                'jawa_timur'  => 'Jawa Timur',
+                'sumatera'    => 'Sumatera Utara',
+                'bali_nusra'  => 'Bali',
+                'kalimantan'  => 'Kalimantan Timur',
+                'sulawesi'    => 'Sulawesi Selatan',
+            ];
+
+            if ($event_hits_total === 0) {
+                $camp_hit_rows = $wpdb->get_results(
+                    "SELECT target_region, SUM(hits_delivered_today) AS hits_today
+                     FROM {$table_campaigns}
+                     WHERE hits_delivered_today > 0
+                     GROUP BY target_region"
+                );
+                if (is_array($camp_hit_rows)) {
+                    foreach ($camp_hit_rows as $c_row) {
+                        $reg  = (string) ($c_row->target_region ?: 'nasional');
+                        $prov = $region_primary_province[$reg] ?? 'DKI Jakarta';
+                        $hits = (int) $c_row->hits_today;
+                        if ($hits > 0) {
+                            if (!isset($provinces[$prov])) {
+                                $provinces[$prov] = ['surfers' => 0, 'dailyHits' => 0, 'antiCheatScore' => 99.8];
+                            }
+                            $provinces[$prov]['dailyHits'] += $hits;
+                        }
+                    }
+                }
+            }
+
+            // 4. Global & per-province Anti-Cheat quality score from recent 24h critical/warning logs
+            $total_alerts_24h = (int) $wpdb->get_var($wpdb->prepare(
+                "SELECT COUNT(*) FROM {$table_logs} WHERE severity IN ('warning', 'critical') AND created_at >= %d",
+                $cutoff_24h_ms
+            ));
+            $base_quality = round(max(95.0, min(100.0, 99.9 - ($total_alerts_24h * 0.08))), 1);
+            foreach ($provinces as $prov_key => $stats) {
+                $provinces[$prov_key]['antiCheatScore'] = $base_quality;
+            }
+
+            $total_surfers = 0;
+            $total_hits    = 0;
+            foreach ($provinces as $stats) {
+                $total_surfers += (int) $stats['surfers'];
+                $total_hits    += (int) $stats['dailyHits'];
+            }
+
+            $active_campaigns = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$table_campaigns} WHERE status = 'active'");
+            $registered_users = (int) count_users()['total_users'];
+
+            $payload = [
+                'source'          => 'mysql_live',
+                'updatedAt'       => gmdate('c'),
+                'pollIntervalSec' => 20,
+                'totalSurfers'    => $total_surfers,
+                'totalHits24h'    => $total_hits,
+                'activeCampaigns' => $active_campaigns,
+                'registeredUsers' => $registered_users,
+                'antiCheatBase'   => $base_quality,
+                'provinces'       => $provinces,
+            ];
+
+            set_transient($cache_key, $payload, 10);
+            return rest_ensure_response($payload);
+        },
+    ]);
+
+    // Atomic Surf Completion (Credit surfer + Deduct campaign + Log live province event)
     register_rest_route($ns, '/surf/complete', [
         'methods'             => 'POST',
         'permission_callback' => 'trafik_bridge_permission_user',
@@ -1040,7 +1313,25 @@ add_action('rest_api_init', function () {
             update_user_meta($uid, 'tn_traffic_points', round($cur_points + $earned, 2));
             update_user_meta($uid, 'tn_total_hits_given', $cur_given + 1);
             update_user_meta($uid, 'tn_daily_surfed_seconds', $cur_secs + $duration_sec);
-            update_user_meta($uid, 'tn_last_active', current_time('mysql'));
+            trafik_bridge_touch_user_presence($user);
+
+            // Log live surf event into wp_trafik_surf_events for real-time map aggregation
+            $geo_raw  = trafik_bridge_detect_geo();
+            $u_city   = (string) get_user_meta($uid, 'tn_city', true);
+            $resolved_city = ($u_city && strtolower($u_city) !== 'indonesia') ? $u_city : ($geo_raw['city'] ?? '');
+            $resolved_prov = trafik_bridge_resolve_province($resolved_city, $geo_raw['regionName'] ?? '');
+            update_user_meta($uid, 'tn_last_province', $resolved_prov);
+
+            $table_events = $wpdb->prefix . 'trafik_surf_events';
+            $wpdb->insert($table_events, [
+                'user_id'      => $uid,
+                'campaign_id'  => $site_id,
+                'province'     => $resolved_prov,
+                'city'         => sanitize_text_field($resolved_city ?: $resolved_prov),
+                'duration_sec' => $duration_sec,
+                'created_at'   => current_time('mysql'),
+            ]);
+            delete_transient('trafik_network_stats_cache');
 
             // Deduct campaign points in MySQL
             $updated_campaign = null;
@@ -1077,6 +1368,77 @@ add_action('rest_api_init', function () {
                 'success'  => true,
                 'user'     => trafik_bridge_format_user(get_user_by('id', $uid)),
                 'campaign' => $updated_campaign,
+            ]);
+        },
+    ]);
+
+    // Lightweight HTTP HEAD 200 OK Verification Endpoint (SSRF-safe via wp_safe_remote_head)
+    register_rest_route($ns, '/websites/head-check', [
+        'methods'             => 'POST',
+        'permission_callback' => '__return_true',
+        'callback'            => function (WP_REST_Request $request) {
+            $params = $request->get_json_params() ?: [];
+            $url    = esc_url_raw(trim((string) ($params['url'] ?? '')));
+
+            if (empty($url) || !preg_match('/^https?:\/\//i', $url)) {
+                return new WP_Error('invalid_url', 'URL website harus diawali http:// atau https://', ['status' => 400]);
+            }
+
+            $host = wp_parse_url($url, PHP_URL_HOST);
+            if (empty($host)) {
+                return new WP_Error('invalid_url', 'Nama domain tidak valid.', ['status' => 400]);
+            }
+
+            $started_at = microtime(true);
+            $args       = [
+                'timeout'     => 8,
+                'redirection' => 5,
+                'sslverify'   => true,
+                'user-agent'  => 'TrafikIndonesia-URLValidator/1.0 (+https://trafik.velocity.web.id)',
+            ];
+
+            $used_method = 'HEAD';
+            $response    = wp_safe_remote_head($url, $args);
+
+            if (!is_wp_error($response)) {
+                $code = (int) wp_remote_retrieve_response_code($response);
+                // Fallback to minimal GET if target server explicitly blocks HEAD with 405/501
+                if ($code === 405 || $code === 501) {
+                    $used_method = 'HEAD->GET';
+                    $response    = wp_safe_remote_get($url, array_merge($args, ['limit_response_size' => 1024]));
+                }
+            }
+
+            $latency_ms = max(1, (int) round((microtime(true) - $started_at) * 1000));
+
+            if (is_wp_error($response)) {
+                return rest_ensure_response([
+                    'ok200'      => false,
+                    'reachable'  => false,
+                    'statusCode' => 0,
+                    'statusText' => 'Connection Failed',
+                    'method'     => $used_method,
+                    'latencyMs'  => $latency_ms,
+                    'finalUrl'   => $url,
+                    'message'    => 'Gagal menghubungi "' . $host . '" via HEAD: ' . $response->get_error_message(),
+                ]);
+            }
+
+            $status_code = (int) wp_remote_retrieve_response_code($response);
+            $status_text = (string) wp_remote_retrieve_response_message($response);
+            $ok200       = ($status_code === 200);
+
+            return rest_ensure_response([
+                'ok200'      => $ok200,
+                'reachable'  => true,
+                'statusCode' => $status_code,
+                'statusText' => $status_text ?: ($ok200 ? 'OK' : ''),
+                'method'     => $used_method,
+                'latencyMs'  => $latency_ms,
+                'finalUrl'   => $url,
+                'message'    => $ok200
+                    ? "Server merespons HTTP 200 OK via {$used_method} ({$latency_ms} ms)."
+                    : "Server merespons HTTP {$status_code}" . ($status_text ? " {$status_text}" : '') . ' — hanya domain dengan status 200 OK yang dapat didaftarkan.',
             ]);
         },
     ]);

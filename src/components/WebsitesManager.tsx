@@ -18,13 +18,19 @@ import {
   ShieldAlert,
   Ban,
   Loader2,
-  Pencil
+  Pencil,
+  Wifi,
+  XCircle
 } from 'lucide-react';
 import { WebsiteCampaign, IndonesianRegionId, DeviceType, WebsiteCategory, UserProfile } from '../types';
 import { INDONESIAN_REGIONS } from '../data/mockData';
 import { auditWebsiteCompliance } from '../services/complianceAuditEngine';
 import { wpAuthService } from '../services/wordpressAuthService';
 import { APP_CONFIG, APP_NAME } from '../config/appConfig';
+import {
+  ClientUrlValidationResult,
+  validateWebsiteUrlClientSide,
+} from '../utils/urlValidator';
 
 interface WebsitesManagerProps {
   user: UserProfile;
@@ -67,9 +73,17 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   const [referrerPolicy, setReferrerPolicy] = useState<'direct' | 'referral'>('direct');
   const [utmEnabled, setUtmEnabled] = useState<boolean>(false);
   const [isProbing, setIsProbing] = useState<boolean>(false);
+  const [isCheckingUrl, setIsCheckingUrl] = useState<boolean>(false);
+  const [urlValidation, setUrlValidation] = useState<ClientUrlValidationResult | null>(null);
+  const [validatedSnapshotKey, setValidatedSnapshotKey] = useState<string>('');
   const [errorMsg, setErrorMsg] = useState<string>('');
   const [detectedViolationKeywords, setDetectedViolationKeywords] = useState<string[]>([]);
   const [successMsg, setSuccessMsg] = useState<string>('');
+
+  const getExistingOtherUrls = () =>
+    websites
+      .filter((s) => !editingSite || s.id !== editingSite.id)
+      .map((s) => s.url);
 
   const openCreateModal = () => {
     setEditingSite(null);
@@ -83,6 +97,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
     setAllocatedPoints(Math.min(200, Math.max(50, user.points)));
     setReferrerPolicy('direct');
     setUtmEnabled(false);
+    setUrlValidation(null);
+    setValidatedSnapshotKey('');
     setErrorMsg('');
     setDetectedViolationKeywords([]);
     setSuccessMsg('');
@@ -101,6 +117,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
     setAllocatedPoints(site.allocatedPoints);
     setReferrerPolicy(site.referrerPolicy || 'direct');
     setUtmEnabled(Boolean(site.utmEnabled));
+    setUrlValidation(null);
+    setValidatedSnapshotKey('');
     setErrorMsg('');
     setDetectedViolationKeywords([]);
     setSuccessMsg('');
@@ -108,12 +126,71 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
   };
 
   const closeFormModal = () => {
-    if (isProbing) return;
+    if (isProbing || isCheckingUrl) return;
     setIsModalOpen(false);
     setEditingSite(null);
+    setUrlValidation(null);
+    setValidatedSnapshotKey('');
     setErrorMsg('');
     setDetectedViolationKeywords([]);
     setSuccessMsg('');
+  };
+
+  const handleUrlInputChange = (nextUrl: string) => {
+    setUrl(nextUrl);
+    setValidatedSnapshotKey('');
+    if (urlValidation) {
+      setUrlValidation(null);
+    }
+  };
+
+  const handleCheckUrlClientSide = async (): Promise<ClientUrlValidationResult> => {
+    setErrorMsg('');
+    setDetectedViolationKeywords([]);
+    setIsCheckingUrl(true);
+
+    const trimmedUrl = url.trim();
+    const trimmedTitle = title.trim();
+
+    // Show immediate checking state for reachability once syntax & policy pass
+    const quickCheck = await validateWebsiteUrlClientSide(trimmedUrl, trimmedTitle, {
+      checkReachability: false,
+      existingUrls: getExistingOtherUrls(),
+    });
+
+    if (!quickCheck.isValid) {
+      setUrlValidation(quickCheck);
+      setIsCheckingUrl(false);
+      setErrorMsg(quickCheck.errorMessage);
+      setDetectedViolationKeywords(quickCheck.detectedKeywords);
+      return quickCheck;
+    }
+
+    setUrlValidation({
+      ...quickCheck,
+      reachability: {
+        status: 'checking',
+        method: 'HEAD',
+        message: `Mengirim permintaan HTTP HEAD via API ke ${quickCheck.hostname}...`,
+      },
+    });
+
+    const fullResult = await validateWebsiteUrlClientSide(trimmedUrl, trimmedTitle, {
+      checkReachability: true,
+      existingUrls: getExistingOtherUrls(),
+    });
+
+    setUrlValidation(fullResult);
+    setIsCheckingUrl(false);
+
+    if (fullResult.isValid) {
+      setValidatedSnapshotKey(`${trimmedUrl}||${trimmedTitle}`);
+    } else {
+      setErrorMsg(fullResult.errorMessage);
+      setDetectedViolationKeywords(fullResult.detectedKeywords);
+    }
+
+    return fullResult;
   };
 
   const calculateCostPerHit = (sec: number) => {
@@ -144,28 +221,50 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       return;
     }
 
-    if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
-      setErrorMsg('URL harus diawali dengan http:// atau https://');
+    if (!editingSite && allocatedPoints > user.points) {
+      setErrorMsg(`Saldo poin Anda tidak cukup (${user.points} Poin tersedia). Beli poin atau kurangi alokasi awal.`);
       return;
     }
 
-    // 1. Instant client-side Heuristic Compliance Audit (Anti-Judi Online & Anti-18+)
-    let auditResult = auditWebsiteCompliance(trimmedUrl, trimmedTitle);
+    // 1. Client-side 3-Stage URL Validation (Valid Domain + Content Policy + Reachability)
+    const snapshotKey = `${trimmedUrl}||${trimmedTitle}`;
+    const isUnchangedEditUrl = Boolean(editingSite && trimmedUrl === editingSite.url);
+    let clientValidation: ClientUrlValidationResult;
+
+    if (urlValidation?.isValid && validatedSnapshotKey === snapshotKey) {
+      clientValidation = urlValidation;
+    } else if (isUnchangedEditUrl) {
+      // Editing metadata (e.g. duration/region/title) without changing URL: validate domain & content policy
+      clientValidation = await validateWebsiteUrlClientSide(trimmedUrl, trimmedTitle, {
+        checkReachability: false,
+        existingUrls: getExistingOtherUrls(),
+      });
+      setUrlValidation(clientValidation);
+      if (!clientValidation.isValid) {
+        setErrorMsg(clientValidation.errorMessage);
+        setDetectedViolationKeywords(clientValidation.detectedKeywords);
+        return;
+      }
+    } else {
+      clientValidation = await handleCheckUrlClientSide();
+      if (!clientValidation.isValid) {
+        return;
+      }
+    }
+
+    let auditResult =
+      clientValidation.policy.audit || auditWebsiteCompliance(clientValidation.normalizedUrl, trimmedTitle);
     if (!auditResult.passed) {
       setErrorMsg(auditResult.reason);
       setDetectedViolationKeywords(auditResult.detectedKeywords);
       return;
     }
 
-    if (!editingSite && allocatedPoints > user.points) {
-      setErrorMsg(`Saldo poin Anda tidak cukup (${user.points} Poin tersedia). Beli poin atau kurangi alokasi awal.`);
-      return;
-    }
-
+    const finalUrl = clientValidation.normalizedUrl || trimmedUrl;
     const cost = calculateCostPerHit(durationSec);
     const shouldProbe =
       wpAuthService.isLiveBridgeActive() &&
-      (!editingSite || trimmedUrl !== editingSite.url || trimmedTitle !== editingSite.title);
+      (!editingSite || finalUrl !== editingSite.url || trimmedTitle !== editingSite.title);
 
     // 2. Live WordPress Server Probe (wp_remote_get HTML scan + X-Frame-Options header check)
     let iframeAllowed = editingSite ? editingSite.iframeAllowed !== false : true;
@@ -175,7 +274,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
 
     if (shouldProbe) {
       setIsProbing(true);
-      const probe = await wpAuthService.probeWebsite(trimmedUrl, trimmedTitle);
+      const probe = await wpAuthService.probeWebsite(finalUrl, trimmedTitle);
       setIsProbing(false);
 
       if (probe) {
@@ -196,7 +295,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       setIsProbing(true);
       const updateResult = await onUpdateWebsite(editingSite.id, {
         title: trimmedTitle,
-        url: trimmedUrl,
+        url: finalUrl,
         category,
         durationSec,
         targetRegion,
@@ -234,6 +333,8 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
       setTimeout(() => {
         setIsModalOpen(false);
         setEditingSite(null);
+        setUrlValidation(null);
+        setValidatedSnapshotKey('');
         setSuccessMsg('');
       }, 1100);
       return;
@@ -241,7 +342,7 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
 
     onAddWebsite({
       title: trimmedTitle,
-      url: trimmedUrl,
+      url: finalUrl,
       category,
       durationSec,
       targetRegion,
@@ -544,7 +645,13 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                 <div className="p-3.5 rounded-lg bg-rose-950/70 border border-rose-800 text-rose-200 text-xs space-y-2">
                   <div className="flex items-center gap-2 font-semibold text-rose-300">
                     <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400" />
-                    <span>{editingSite ? 'Perubahan Ditolak' : 'Pendaftaran Ditolak: Pelanggaran Kepatuhan'}</span>
+                    <span>
+                      {detectedViolationKeywords.length > 0
+                        ? editingSite
+                          ? 'Perubahan Ditolak: Pelanggaran Kebijakan Konten'
+                          : 'Pendaftaran Ditolak: Pelanggaran Kebijakan Konten'
+                        : 'Validasi URL Gagal'}
+                    </span>
                   </div>
                   <p className="text-xs leading-relaxed text-rose-200">{errorMsg}</p>
                   {detectedViolationKeywords.length > 0 && (
@@ -577,26 +684,125 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                   required
                   placeholder="Contoh: Toko Herbal Alami Solo"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setValidatedSnapshotKey('');
+                  }}
                   className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 focus:outline-none focus:border-emerald-500"
                 />
               </div>
 
-              {/* URL Input */}
+              {/* URL Input with Client-Side Validation */}
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  URL Target Website
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-300">
+                    URL Target Website
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleCheckUrlClientSide}
+                    disabled={isCheckingUrl || isProbing || !url.trim() || url.trim() === 'https://'}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-emerald-700/60 bg-emerald-950/60 hover:bg-emerald-900/60 disabled:opacity-50 text-[11px] font-medium text-emerald-300 transition-colors cursor-pointer"
+                  >
+                    {isCheckingUrl ? (
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                    ) : (
+                      <Wifi className="w-3 h-3" />
+                    )}
+                    <span>{isCheckingUrl ? 'Memeriksa URL...' : 'Validasi & Cek URL'}</span>
+                  </button>
+                </div>
                 <input
                   type="url"
                   required
                   placeholder="https://domainanda.com/produk"
                   value={url}
-                  onChange={(e) => setUrl(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-800 bg-slate-950 text-xs text-slate-100 font-mono focus:outline-none focus:border-emerald-500"
+                  onChange={(e) => handleUrlInputChange(e.target.value)}
+                  className={`w-full px-3 py-2 rounded-lg border bg-slate-950 text-xs text-slate-100 font-mono focus:outline-none transition-colors ${
+                    urlValidation
+                      ? urlValidation.isValid
+                        ? 'border-emerald-600/80 focus:border-emerald-500'
+                        : 'border-rose-700/80 focus:border-rose-500'
+                      : 'border-slate-800 focus:border-emerald-500'
+                  }`}
                 />
+
+                {/* 3-Point Client-Side URL Validation Status Panel */}
+                {urlValidation && (
+                  <div className="mt-2 p-2.5 rounded-lg bg-slate-950/90 border border-slate-800 space-y-1.5 text-[11px]">
+                    <div className="flex items-start gap-2">
+                      {urlValidation.domain.status === 'pass' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <span className="font-semibold text-slate-200">Domain Valid: </span>
+                        <span className={urlValidation.domain.status === 'pass' ? 'text-emerald-300/90' : 'text-rose-300'}>
+                          {urlValidation.domain.message}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      {urlValidation.policy.status === 'pass' ? (
+                        <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                      )}
+                      <div>
+                        <span className="font-semibold text-slate-200">Kebijakan Konten: </span>
+                        <span className={urlValidation.policy.status === 'pass' ? 'text-emerald-300/90' : 'text-rose-300'}>
+                          {urlValidation.policy.message}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-2">
+                      {urlValidation.reachability.status === 'checking' ? (
+                        <Loader2 className="w-3.5 h-3.5 text-cyan-400 animate-spin shrink-0 mt-0.5" />
+                      ) : urlValidation.reachability.status === 'pass' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      ) : urlValidation.reachability.status === 'fail' ? (
+                        <XCircle className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
+                      ) : (
+                        <AlertTriangle className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="font-semibold text-slate-200">Status HTTP (HEAD):</span>
+                        {typeof urlValidation.reachability.statusCode === 'number' &&
+                          urlValidation.reachability.statusCode > 0 && (
+                            <span
+                              className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold border ${
+                                urlValidation.reachability.statusCode === 200
+                                  ? 'bg-emerald-950 text-emerald-300 border-emerald-700/60'
+                                  : 'bg-rose-950 text-rose-300 border-rose-700/60'
+                              }`}
+                            >
+                              {urlValidation.reachability.statusCode}{' '}
+                              {urlValidation.reachability.statusText || ''}
+                            </span>
+                          )}
+                        <span
+                          className={
+                            urlValidation.reachability.status === 'pass'
+                              ? 'text-emerald-300/90'
+                              : urlValidation.reachability.status === 'fail'
+                              ? 'text-rose-300'
+                              : urlValidation.reachability.status === 'checking'
+                              ? 'text-cyan-300'
+                              : 'text-slate-400'
+                          }
+                        >
+                          {urlValidation.reachability.message}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <span className="text-[11px] text-slate-500 mt-1 block">
-                  * Dilarang mendaftarkan situs judi online/slot, phising, atau skrip pemblokir iframe.
+                  * Sistem memvalidasi format domain, kepatuhan anti-judi/18+, dan mengirim permintaan HTTP HEAD via API untuk memastikan status <strong className="text-slate-300">200 OK</strong> sebelum disimpan.
                 </span>
               </div>
 
@@ -772,19 +978,21 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                 <button
                   type="button"
                   onClick={closeFormModal}
-                  disabled={isProbing}
-                  className="px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+                  disabled={isProbing || isCheckingUrl}
+                  className="px-4 py-2 rounded-lg text-xs font-medium text-slate-400 hover:text-slate-200 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  disabled={isProbing}
+                  disabled={isProbing || isCheckingUrl}
                   className="px-5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white text-xs font-semibold cursor-pointer transition-colors shadow-sm inline-flex items-center gap-1.5"
                 >
-                  {isProbing && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {(isProbing || isCheckingUrl) && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   <span>
-                    {isProbing
+                    {isCheckingUrl
+                      ? 'Memvalidasi URL & Jangkauan...'
+                      : isProbing
                       ? 'Memindai & Menyimpan...'
                       : editingSite
                       ? 'Simpan Perubahan'

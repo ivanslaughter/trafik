@@ -24,6 +24,25 @@ export interface BridgeHealthResponse {
   message: string;
 }
 
+export interface NetworkMapStatsResponse {
+  source: 'mysql_live';
+  updatedAt: string;
+  pollIntervalSec: number;
+  totalSurfers: number;
+  totalHits24h: number;
+  activeCampaigns: number;
+  registeredUsers: number;
+  antiCheatBase: number;
+  provinces: Record<
+    string,
+    {
+      surfers: number;
+      dailyHits: number;
+      antiCheatScore: number;
+    }
+  >;
+}
+
 const isHostedProduction =
   typeof window !== 'undefined' &&
   window.location.hostname.endsWith('velocity.web.id');
@@ -426,6 +445,48 @@ class WordPressAuthService {
       myWebsites: WebsiteCampaign[];
       communityWebsites: WebsiteCampaign[];
     }>('/websites', { method: 'GET' });
+    return res.ok && res.data ? res.data : null;
+  }
+
+  public async fetchNetworkMapStats(fresh = false): Promise<NetworkMapStatsResponse | null> {
+    if (this.config.authMode !== 'bridge') return null;
+    const query = fresh ? '?fresh=1' : '';
+    const res = await this.request<NetworkMapStatsResponse>(
+      `/network/stats${query}`,
+      { method: 'GET' },
+      Boolean(this.token)
+    );
+    return res.ok && res.data ? res.data : null;
+  }
+
+  public async checkUrlHeadStatus(url: string): Promise<{
+    ok200: boolean;
+    reachable: boolean;
+    statusCode: number;
+    statusText?: string;
+    method?: string;
+    latencyMs?: number;
+    finalUrl?: string;
+    message: string;
+  } | null> {
+    if (this.config.authMode !== 'bridge') return null;
+    const res = await this.request<{
+      ok200: boolean;
+      reachable: boolean;
+      statusCode: number;
+      statusText?: string;
+      method?: string;
+      latencyMs?: number;
+      finalUrl?: string;
+      message: string;
+    }>(
+      '/websites/head-check',
+      {
+        method: 'POST',
+        body: JSON.stringify({ url }),
+      },
+      false
+    );
     return res.ok && res.data ? res.data : null;
   }
 

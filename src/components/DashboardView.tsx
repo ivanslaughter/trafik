@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Sparkles,
   ArrowUpRight,
@@ -18,6 +18,9 @@ import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, IndonesianRegionId } f
 import { IndonesiaNetworkMap } from './IndonesiaNetworkMap';
 import { UserWeeklyTrendChart } from './UserWeeklyTrendChart';
 import { APP_NAME, APP_CONFIG } from '../config/appConfig';
+import { wpAuthService, NetworkMapStatsResponse } from '../services/wordpressAuthService';
+
+const DASHBOARD_POLL_INTERVAL_MS = 30_000;
 
 interface DashboardViewProps {
   user: UserProfile;
@@ -28,6 +31,7 @@ interface DashboardViewProps {
   onOpenAntiCheat: () => void;
   onOpenPricing: () => void;
   onOpenHelp?: () => void;
+  onRefreshDashboardData?: () => Promise<void>;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -39,8 +43,83 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenAntiCheat,
   onOpenPricing,
   onOpenHelp,
+  onRefreshDashboardData,
 }) => {
   const [mapRegion, setMapRegion] = useState<IndonesianRegionId>('nasional');
+  const [liveNetworkStats, setLiveNetworkStats] = useState<NetworkMapStatsResponse | null>(null);
+  const [isRefreshingLive, setIsRefreshingLive] = useState<boolean>(false);
+  const [lastSyncedTime, setLastSyncedTime] = useState<string>('');
+  const isFetchingRef = useRef<boolean>(false);
+
+  // Unified real-time WordPress Bridge sync (Map MySQL stats + User/Websites KPIs)
+  const syncDashboardRealtime = useCallback(
+    async (forceFresh = false, includeAccountKpis = true) => {
+      if (wpAuthService.getConfig().authMode !== 'bridge') {
+        setLiveNetworkStats(null);
+        return;
+      }
+      if (isFetchingRef.current) return;
+      isFetchingRef.current = true;
+      setIsRefreshingLive(true);
+
+      try {
+        const tasks: Promise<unknown>[] = [
+          wpAuthService.fetchNetworkMapStats(forceFresh).then((stats) => {
+            if (stats && stats.source === 'mysql_live') {
+              setLiveNetworkStats(stats);
+              setLastSyncedTime(
+                new Date().toLocaleTimeString('id-ID', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  second: '2-digit',
+                })
+              );
+            }
+          }),
+        ];
+
+        if (includeAccountKpis && wpAuthService.isLiveBridgeActive() && onRefreshDashboardData) {
+          tasks.push(onRefreshDashboardData().catch(() => undefined));
+        }
+
+        await Promise.all(tasks);
+      } finally {
+        isFetchingRef.current = false;
+        setIsRefreshingLive(false);
+      }
+    },
+    [onRefreshDashboardData]
+  );
+
+  // 30-second visibility-aware polling hook (pauses in background tabs to save 4G data)
+  useEffect(() => {
+    let active = true;
+    const poll = (forceFresh = false, includeKpis = true) => {
+      if (!active || document.visibilityState === 'hidden') return;
+      syncDashboardRealtime(forceFresh, includeKpis);
+    };
+
+    // Initial immediate fetch for map stats (App already synced account KPIs on mount)
+    poll(false, false);
+
+    const intervalId = window.setInterval(() => {
+      poll(false, true);
+    }, DASHBOARD_POLL_INTERVAL_MS);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        poll(false, true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [syncDashboardRealtime]);
+
   const activeWebsitesCount = websites.filter((w) => w.status === 'active').length;
   const totalAllocatedPoints = websites.reduce((acc, curr) => acc + curr.allocatedPoints, 0);
   const totalHitsDeliveredToday = websites.reduce((acc, curr) => acc + curr.hitsDeliveredToday, 0);
@@ -223,6 +302,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <IndonesiaNetworkMap
         selectedRegion={mapRegion}
         onSelectRegion={setMapRegion}
+        liveNetworkStats={liveNetworkStats}
+        isRefreshingLive={isRefreshingLive}
+        lastSyncedTime={lastSyncedTime}
+        onManualRefresh={() => syncDashboardRealtime(true, true)}
       />
 
       {/* 7-Day Trend Recharts Graph & Daily Goal / Anti-Cheat Cards */}
