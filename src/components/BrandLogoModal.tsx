@@ -13,6 +13,7 @@ import {
 import {
   BrandLogoConfig,
   DEFAULT_BRAND_LOGO,
+  DEFAULT_FAVICON_PATH,
   processLogoFile,
   processRawSvgCode,
 } from '../utils/logoBranding';
@@ -35,6 +36,7 @@ export const BrandLogoModal: React.FC<BrandLogoModalProps> = ({
   onSaveBrandLogo,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const faviconInputRef = useRef<HTMLInputElement>(null);
 
   const [draft, setDraft] = useState<BrandLogoConfig>(brandLogo);
   const [inputMode, setInputMode] = useState<'upload' | 'svg_code'>('upload');
@@ -91,6 +93,24 @@ export const BrandLogoModal: React.FC<BrandLogoModalProps> = ({
     setSuccessMsg('SVG berhasil disanitasi & dimuat ke pratinjau!');
   };
 
+  const handleFaviconSelected = async (file: File | null | undefined) => {
+    if (!file) return;
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    const result = await processLogoFile(file);
+    if (!result.ok || !result.dataUrl) {
+      setErrorMsg(result.error || 'Gagal memproses file favicon.');
+      return;
+    }
+
+    setDraft((prev) => ({
+      ...prev,
+      faviconDataUrl: result.dataUrl!,
+      faviconFileName: result.fileName || file.name,
+    }));
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
@@ -102,10 +122,12 @@ export const BrandLogoModal: React.FC<BrandLogoModalProps> = ({
     setErrorMsg('');
     setSuccessMsg('');
     setRawSvgCode('');
-    setDraft({
+    setDraft((prev) => ({
       ...DEFAULT_BRAND_LOGO,
+      faviconDataUrl: prev.faviconDataUrl || null,
+      faviconFileName: prev.faviconFileName || '',
       updatedAt: new Date().toISOString(),
-    });
+    }));
   };
 
   const handleSave = async () => {
@@ -322,11 +344,71 @@ export const BrandLogoModal: React.FC<BrandLogoModalProps> = ({
           </div>
         </div>
 
+        {/* Dedicated Favicon Section (Independent from Header Logo) */}
+        <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4 space-y-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg border border-slate-700 bg-slate-900 flex items-center justify-center p-1.5 shrink-0">
+                <img
+                  src={draft.faviconDataUrl || DEFAULT_FAVICON_PATH}
+                  alt="Pratinjau Favicon"
+                  className="w-full h-full object-contain"
+                />
+              </div>
+              <div>
+                <div className="text-xs font-semibold text-slate-200">
+                  Favicon Tab Browser (Terpisah dari Logo Header)
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  {draft.faviconDataUrl
+                    ? `Kustom: ${draft.faviconFileName || 'favicon kustom'}`
+                    : 'Menggunakan ikon resmi Trafik (favicon.svg)'}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <input
+                ref={faviconInputRef}
+                type="file"
+                accept=".svg,image/svg+xml,.png,image/png,.webp,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  handleFaviconSelected(e.target.files?.[0]);
+                  e.target.value = '';
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => faviconInputRef.current?.click()}
+                className="px-2.5 py-1.5 rounded-lg border border-slate-700 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-[11px] font-medium cursor-pointer transition-colors"
+              >
+                Ganti Favicon
+              </button>
+              {draft.faviconDataUrl && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      faviconDataUrl: null,
+                      faviconFileName: '',
+                    }))
+                  }
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-700/80 text-slate-400 hover:text-white hover:bg-slate-800 text-[11px] cursor-pointer transition-colors"
+                >
+                  Bawaan
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Security Note */}
         <div className="mt-3 flex items-center gap-2 text-[11px] text-slate-400">
           <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>
-            Sanitasi SVG aktif di klien &amp; WordPress Bridge — tag <code>&lt;script&gt;</code> &amp; atribut berbahaya otomatis dihapus. Favicon browser ikut terupdate.
+            Sanitasi SVG aktif di klien &amp; WordPress Bridge — tag <code>&lt;script&gt;</code> &amp; atribut berbahaya otomatis dihapus.
           </span>
         </div>
 

@@ -147,10 +147,10 @@ export default function App() {
   const [surfNotice, setSurfNotice] = useState<string>('');
   const [brandLogo, setBrandLogo] = useState<BrandLogoConfig>(() => loadStoredBrandLogo());
 
-  // Apply browser favicon whenever custom logo changes
+  // Apply dedicated browser favicon (defaults to official ./favicon.svg, independent of header logo)
   useEffect(() => {
-    applyBrandFavicon(brandLogo.logoDataUrl);
-  }, [brandLogo.logoDataUrl]);
+    applyBrandFavicon(brandLogo.faviconDataUrl || null);
+  }, [brandLogo.faviconDataUrl]);
 
   // Pull global branding logo from WordPress Bridge (public endpoint) on mount
   useEffect(() => {

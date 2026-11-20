@@ -5,8 +5,12 @@ export interface BrandLogoConfig {
   heightPx: number;
   showBrandText: boolean;
   invertForDark: boolean;
+  faviconDataUrl?: string | null;
+  faviconFileName?: string;
   updatedAt?: string;
 }
+
+export const DEFAULT_FAVICON_PATH = './favicon.svg';
 
 export const DEFAULT_BRAND_LOGO: BrandLogoConfig = {
   logoDataUrl: null,
@@ -15,6 +19,8 @@ export const DEFAULT_BRAND_LOGO: BrandLogoConfig = {
   heightPx: 32,
   showBrandText: true,
   invertForDark: false,
+  faviconDataUrl: null,
+  faviconFileName: '',
 };
 
 const STORAGE_KEY = 'tn_brand_logo_config_v1';
@@ -229,22 +235,9 @@ export async function processLogoFile(
   });
 }
 
-let originalFaviconHref: string | null = null;
-
-export function applyBrandFavicon(logoDataUrl: string | null): void {
+export function applyBrandFavicon(faviconDataUrl?: string | null): void {
   if (typeof document === 'undefined') return;
   let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-
-  if (originalFaviconHref === null && link) {
-    originalFaviconHref = link.getAttribute('href') || '';
-  }
-
-  if (!logoDataUrl) {
-    if (link && originalFaviconHref) {
-      link.href = originalFaviconHref;
-    }
-    return;
-  }
 
   if (!link) {
     link = document.createElement('link');
@@ -252,10 +245,16 @@ export function applyBrandFavicon(logoDataUrl: string | null): void {
     document.head.appendChild(link);
   }
 
-  link.type = logoDataUrl.startsWith('data:image/svg+xml')
+  if (!faviconDataUrl) {
+    link.type = 'image/svg+xml';
+    link.href = DEFAULT_FAVICON_PATH;
+    return;
+  }
+
+  link.type = faviconDataUrl.startsWith('data:image/svg+xml')
     ? 'image/svg+xml'
-    : logoDataUrl.startsWith('data:image/webp')
+    : faviconDataUrl.startsWith('data:image/webp')
     ? 'image/webp'
     : 'image/png';
-  link.href = logoDataUrl;
+  link.href = faviconDataUrl;
 }

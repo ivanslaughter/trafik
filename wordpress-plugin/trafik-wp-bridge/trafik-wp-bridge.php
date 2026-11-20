@@ -1975,85 +1975,83 @@ add_action('rest_api_init', function () {
             'callback'            => function (WP_REST_Request $request) {
                 $params = $request->get_json_params() ?: [];
                 $raw_data_url = isset($params['logoDataUrl']) ? trim((string) $params['logoDataUrl']) : '';
+                $raw_favicon_url = isset($params['faviconDataUrl']) ? trim((string) $params['faviconDataUrl']) : '';
                 $height_px = max(20, min(48, intval($params['heightPx'] ?? 32)));
                 $show_brand_text = isset($params['showBrandText']) ? (bool) $params['showBrandText'] : true;
                 $invert_for_dark = !empty($params['invertForDark']);
                 $file_name = sanitize_file_name((string) ($params['fileName'] ?? ''));
+                $favicon_file_name = sanitize_file_name((string) ($params['faviconFileName'] ?? ''));
 
-                // Allow resetting logo to default text wordmark
-                if ($raw_data_url === '') {
-                    $reset_branding = [
-                        'logoDataUrl'   => null,
-                        'logoType'      => null,
-                        'fileName'      => '',
-                        'heightPx'      => $height_px,
-                        'showBrandText' => true,
-                        'invertForDark' => false,
-                        'updatedAt'     => gmdate('c'),
+                $sanitize_image_data_url = function ($input_url, $field_label) {
+                    if ($input_url === '') {
+                        return ['ok' => true, 'dataUrl' => null, 'type' => null];
+                    }
+                    if (strlen($input_url) > 512000) {
+                        return [
+                            'ok'    => false,
+                            'error' => new WP_Error('logo_too_large', "Ukuran {$field_label} terlalu besar (maksimal 350 KB).", ['status' => 400]),
+                        ];
+                    }
+                    if (preg_match('/^data:image\/svg\+xml;base64,([A-Za-z0-9+\/=]+)$/', $input_url, $m)) {
+                        $decoded_svg = base64_decode($m[1], true);
+                        if ($decoded_svg === false || stripos($decoded_svg, '<svg') === false) {
+                            return ['ok' => false, 'error' => new WP_Error('invalid_svg', "Konten SVG {$field_label} tidak valid.", ['status' => 400])];
+                        }
+                        $clean_svg = preg_replace('/<\?(?:xml|php)[\s\S]*?\?>/i', '', $decoded_svg);
+                        $clean_svg = preg_replace('/<!DOCTYPE[\s\S]*?>/i', '', $clean_svg);
+                        $clean_svg = preg_replace('/<(script|foreignObject|iframe|object|embed|link|meta|base)\b[^>]*>[\s\S]*?<\/\1>/i', '', $clean_svg);
+                        $clean_svg = preg_replace('/<(script|foreignObject|iframe|object|embed|link|meta|base)\b[^>]*\/?>/i', '', $clean_svg);
+                        $clean_svg = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean_svg);
+                        $clean_svg = preg_replace('/(?:xlink:)?href\s*=\s*(?:"\s*(?:javascript:|vbscript:|data:text\/html)[^"]*"|\'\s*(?:javascript:|vbscript:|data:text\/html)[^\']*\')/i', '', $clean_svg);
+                        $clean_svg = trim($clean_svg);
+
+                        if (stripos($clean_svg, '<svg') === false) {
+                            return ['ok' => false, 'error' => new WP_Error('invalid_svg', "Struktur SVG {$field_label} gagal melewati sanitasi keamanan.", ['status' => 400])];
+                        }
+                        return [
+                            'ok'      => true,
+                            'dataUrl' => 'data:image/svg+xml;base64,' . base64_encode($clean_svg),
+                            'type'    => 'svg',
+                        ];
+                    }
+                    if (preg_match('/^data:image\/(png|webp);base64,([A-Za-z0-9+\/=]+)$/', $input_url, $m)) {
+                        $decoded_img = base64_decode($m[2], true);
+                        if ($decoded_img === false || strlen($decoded_img) < 16) {
+                            return ['ok' => false, 'error' => new WP_Error('invalid_image', "File gambar {$field_label} tidak valid.", ['status' => 400])];
+                        }
+                        $img_type = strtolower($m[1]);
+                        return [
+                            'ok'      => true,
+                            'dataUrl' => 'data:image/' . $img_type . ';base64,' . $m[2],
+                            'type'    => $img_type,
+                        ];
+                    }
+                    return [
+                        'ok'    => false,
+                        'error' => new WP_Error('unsupported_logo_format', "Format {$field_label} tidak didukung. Gunakan file SVG, PNG, atau WebP.", ['status' => 400]),
                     ];
-                    update_option('trafik_bridge_branding', $reset_branding, false);
-                    return rest_ensure_response([
-                        'success'  => true,
-                        'branding' => $reset_branding,
-                        'message'  => 'Logo portal dikembalikan ke default.',
-                    ]);
+                };
+
+                $logo_res = $sanitize_image_data_url($raw_data_url, 'logo');
+                if (!$logo_res['ok']) {
+                    return $logo_res['error'];
                 }
 
-                // Limit encoded payload to 500 KB
-                if (strlen($raw_data_url) > 512000) {
-                    return new WP_Error(
-                        'logo_too_large',
-                        'Ukuran logo terlalu besar (maksimal 350 KB).',
-                        ['status' => 400]
-                    );
-                }
-
-                $logo_type = null;
-                $clean_data_url = '';
-
-                if (preg_match('/^data:image\/svg\+xml;base64,([A-Za-z0-9+\/=]+)$/', $raw_data_url, $m)) {
-                    $decoded_svg = base64_decode($m[1], true);
-                    if ($decoded_svg === false || stripos($decoded_svg, '<svg') === false) {
-                        return new WP_Error('invalid_svg', 'Konten SVG tidak valid.', ['status' => 400]);
-                    }
-                    // Server-side XSS sanitization for SVG
-                    $clean_svg = preg_replace('/<\?(?:xml|php)[\s\S]*?\?>/i', '', $decoded_svg);
-                    $clean_svg = preg_replace('/<!DOCTYPE[\s\S]*?>/i', '', $clean_svg);
-                    $clean_svg = preg_replace('/<(script|foreignObject|iframe|object|embed|link|meta|base)\b[^>]*>[\s\S]*?<\/\1>/i', '', $clean_svg);
-                    $clean_svg = preg_replace('/<(script|foreignObject|iframe|object|embed|link|meta|base)\b[^>]*\/?>/i', '', $clean_svg);
-                    $clean_svg = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean_svg);
-                    $clean_svg = preg_replace('/(?:xlink:)?href\s*=\s*(?:"\s*(?:javascript:|vbscript:|data:text\/html)[^"]*"|\'\s*(?:javascript:|vbscript:|data:text\/html)[^\']*\')/i', '', $clean_svg);
-                    $clean_svg = trim($clean_svg);
-
-                    if (stripos($clean_svg, '<svg') === false) {
-                        return new WP_Error('invalid_svg', 'Struktur SVG gagal melewati sanitasi keamanan.', ['status' => 400]);
-                    }
-
-                    $logo_type = 'svg';
-                    $clean_data_url = 'data:image/svg+xml;base64,' . base64_encode($clean_svg);
-                } elseif (preg_match('/^data:image\/(png|webp);base64,([A-Za-z0-9+\/=]+)$/', $raw_data_url, $m)) {
-                    $decoded_img = base64_decode($m[2], true);
-                    if ($decoded_img === false || strlen($decoded_img) < 16) {
-                        return new WP_Error('invalid_image', 'File gambar PNG/WebP tidak valid.', ['status' => 400]);
-                    }
-                    $logo_type = strtolower($m[1]);
-                    $clean_data_url = 'data:image/' . $logo_type . ';base64,' . $m[2];
-                } else {
-                    return new WP_Error(
-                        'unsupported_logo_format',
-                        'Format logo tidak didukung. Gunakan file SVG, PNG, atau WebP.',
-                        ['status' => 400]
-                    );
+                $favicon_res = $sanitize_image_data_url($raw_favicon_url, 'favicon');
+                if (!$favicon_res['ok']) {
+                    return $favicon_res['error'];
                 }
 
                 $saved_branding = [
-                    'logoDataUrl'   => $clean_data_url,
-                    'logoType'      => $logo_type,
-                    'fileName'      => $file_name,
-                    'heightPx'      => $height_px,
-                    'showBrandText' => $show_brand_text,
-                    'invertForDark' => $invert_for_dark,
-                    'updatedAt'     => gmdate('c'),
+                    'logoDataUrl'     => $logo_res['dataUrl'],
+                    'logoType'        => $logo_res['type'],
+                    'fileName'        => $logo_res['dataUrl'] ? $file_name : '',
+                    'heightPx'        => $height_px,
+                    'showBrandText'   => $logo_res['dataUrl'] ? $show_brand_text : true,
+                    'invertForDark'   => $logo_res['dataUrl'] ? $invert_for_dark : false,
+                    'faviconDataUrl'  => $favicon_res['dataUrl'],
+                    'faviconFileName' => $favicon_res['dataUrl'] ? $favicon_file_name : '',
+                    'updatedAt'       => gmdate('c'),
                 ];
 
                 update_option('trafik_bridge_branding', $saved_branding, false);
@@ -2061,7 +2059,7 @@ add_action('rest_api_init', function () {
                 return rest_ensure_response([
                     'success'  => true,
                     'branding' => $saved_branding,
-                    'message'  => 'Logo portal berhasil disanitasi dan disimpan ke WordPress Bridge!',
+                    'message'  => 'Logo & favicon portal berhasil disimpan ke WordPress Bridge!',
                 ]);
             },
         ],
