@@ -3,7 +3,7 @@
  * Plugin Name: Trafik WP Bridge
  * Plugin URI: https://trafik.velocity.web.id
  * Description: Menjembatani aplikasi Trafik (React SPA) dengan database MySQL/MariaDB & autentikasi pengguna WordPress via REST API (/wp-json/trafik/v1).
- * Version: 1.3.0
+ * Version: 1.4.0
  * Author: Velocity Digital
  * Author URI: https://velocity.web.id
  * License: GPLv2 or later
@@ -14,8 +14,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('TRAFIK_BRIDGE_VERSION', '1.3.0');
-define('TRAFIK_BRIDGE_DB_VERSION', '1.3.0');
+define('TRAFIK_BRIDGE_VERSION', '1.4.0');
+define('TRAFIK_BRIDGE_DB_VERSION', '1.4.0');
 
 /**
  * 1. ACTIVATION & DATABASE SCHEMA (MySQL / MariaDB)
@@ -1952,6 +1952,119 @@ add_action('rest_api_init', function () {
                 'user'    => trafik_bridge_format_user($target),
             ]);
         },
+    ]);
+
+    // Portal Logo & Branding (Public GET, Admin-only POST with strict SVG sanitization)
+    register_rest_route($ns, '/branding', [
+        [
+            'methods'             => 'GET',
+            'permission_callback' => '__return_true',
+            'callback'            => function () {
+                $stored = get_option('trafik_bridge_branding', null);
+                if (!is_array($stored)) {
+                    $stored = null;
+                }
+                return rest_ensure_response([
+                    'branding' => $stored,
+                ]);
+            },
+        ],
+        [
+            'methods'             => 'POST',
+            'permission_callback' => 'trafik_bridge_permission_admin',
+            'callback'            => function (WP_REST_Request $request) {
+                $params = $request->get_json_params() ?: [];
+                $raw_data_url = isset($params['logoDataUrl']) ? trim((string) $params['logoDataUrl']) : '';
+                $height_px = max(20, min(48, intval($params['heightPx'] ?? 32)));
+                $show_brand_text = isset($params['showBrandText']) ? (bool) $params['showBrandText'] : true;
+                $invert_for_dark = !empty($params['invertForDark']);
+                $file_name = sanitize_file_name((string) ($params['fileName'] ?? ''));
+
+                // Allow resetting logo to default text wordmark
+                if ($raw_data_url === '') {
+                    $reset_branding = [
+                        'logoDataUrl'   => null,
+                        'logoType'      => null,
+                        'fileName'      => '',
+                        'heightPx'      => $height_px,
+                        'showBrandText' => true,
+                        'invertForDark' => false,
+                        'updatedAt'     => gmdate('c'),
+                    ];
+                    update_option('trafik_bridge_branding', $reset_branding, false);
+                    return rest_ensure_response([
+                        'success'  => true,
+                        'branding' => $reset_branding,
+                        'message'  => 'Logo portal dikembalikan ke default.',
+                    ]);
+                }
+
+                // Limit encoded payload to 500 KB
+                if (strlen($raw_data_url) > 512000) {
+                    return new WP_Error(
+                        'logo_too_large',
+                        'Ukuran logo terlalu besar (maksimal 350 KB).',
+                        ['status' => 400]
+                    );
+                }
+
+                $logo_type = null;
+                $clean_data_url = '';
+
+                if (preg_match('/^data:image\/svg\+xml;base64,([A-Za-z0-9+\/=]+)$/', $raw_data_url, $m)) {
+                    $decoded_svg = base64_decode($m[1], true);
+                    if ($decoded_svg === false || stripos($decoded_svg, '<svg') === false) {
+                        return new WP_Error('invalid_svg', 'Konten SVG tidak valid.', ['status' => 400]);
+                    }
+                    // Server-side XSS sanitization for SVG
+                    $clean_svg = preg_replace('/<\?(?:xml|php)[\s\S]*?\?>/i', '', $decoded_svg);
+                    $clean_svg = preg_replace('/<!DOCTYPE[\s\S]*?>/i', '', $clean_svg);
+                    $clean_svg = preg_replace('/<(script|foreignObject|iframe|object|embed|link|meta|base)\b[^>]*>[\s\S]*?<\/\1>/i', '', $clean_svg);
+                    $clean_svg = preg_replace('/<(script|foreignObject|iframe|object|embed|link|meta|base)\b[^>]*\/?>/i', '', $clean_svg);
+                    $clean_svg = preg_replace('/\s+on[a-z]+\s*=\s*(?:"[^"]*"|\'[^\']*\'|[^\s>]+)/i', '', $clean_svg);
+                    $clean_svg = preg_replace('/(?:xlink:)?href\s*=\s*(?:"\s*(?:javascript:|vbscript:|data:text\/html)[^"]*"|\'\s*(?:javascript:|vbscript:|data:text\/html)[^\']*\')/i', '', $clean_svg);
+                    $clean_svg = trim($clean_svg);
+
+                    if (stripos($clean_svg, '<svg') === false) {
+                        return new WP_Error('invalid_svg', 'Struktur SVG gagal melewati sanitasi keamanan.', ['status' => 400]);
+                    }
+
+                    $logo_type = 'svg';
+                    $clean_data_url = 'data:image/svg+xml;base64,' . base64_encode($clean_svg);
+                } elseif (preg_match('/^data:image\/(png|webp);base64,([A-Za-z0-9+\/=]+)$/', $raw_data_url, $m)) {
+                    $decoded_img = base64_decode($m[2], true);
+                    if ($decoded_img === false || strlen($decoded_img) < 16) {
+                        return new WP_Error('invalid_image', 'File gambar PNG/WebP tidak valid.', ['status' => 400]);
+                    }
+                    $logo_type = strtolower($m[1]);
+                    $clean_data_url = 'data:image/' . $logo_type . ';base64,' . $m[2];
+                } else {
+                    return new WP_Error(
+                        'unsupported_logo_format',
+                        'Format logo tidak didukung. Gunakan file SVG, PNG, atau WebP.',
+                        ['status' => 400]
+                    );
+                }
+
+                $saved_branding = [
+                    'logoDataUrl'   => $clean_data_url,
+                    'logoType'      => $logo_type,
+                    'fileName'      => $file_name,
+                    'heightPx'      => $height_px,
+                    'showBrandText' => $show_brand_text,
+                    'invertForDark' => $invert_for_dark,
+                    'updatedAt'     => gmdate('c'),
+                ];
+
+                update_option('trafik_bridge_branding', $saved_branding, false);
+
+                return rest_ensure_response([
+                    'success'  => true,
+                    'branding' => $saved_branding,
+                    'message'  => 'Logo portal berhasil disanitasi dan disimpan ke WordPress Bridge!',
+                ]);
+            },
+        ],
     ]);
 });
 

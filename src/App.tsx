@@ -18,6 +18,13 @@ import { wpAuthService } from './services/wordpressAuthService';
 import { HelpCircle, Ban, MapPin } from 'lucide-react';
 import { APP_NAME, APP_CONFIG, getPageTitle } from './config/appConfig';
 import { AntiCheatToastContainer, AntiCheatToastItem } from './components/AntiCheatToast';
+import { BrandMark } from './components/BrandMark';
+import {
+  BrandLogoConfig,
+  loadStoredBrandLogo,
+  saveStoredBrandLogo,
+  applyBrandFavicon,
+} from './utils/logoBranding';
 
 // Route & modal code-splitting for fast 4G mobile loading
 const LandingPage = React.lazy(() =>
@@ -55,6 +62,9 @@ const WordPressAuthModal = React.lazy(() =>
 );
 const PricingModal = React.lazy(() =>
   import('./components/PricingModal').then((m) => ({ default: m.PricingModal }))
+);
+const BrandLogoModal = React.lazy(() =>
+  import('./components/BrandLogoModal').then((m) => ({ default: m.BrandLogoModal }))
 );
 
 function RouteLoadingSkeleton() {
@@ -130,10 +140,52 @@ export default function App() {
   // Modals & Geo Status
   const [pricingModalOpen, setPricingModalOpen] = useState<boolean>(false);
   const [profileModalOpen, setProfileModalOpen] = useState<boolean>(false);
+  const [brandLogoModalOpen, setBrandLogoModalOpen] = useState<boolean>(false);
   const [manualChallengeOpen, setManualChallengeOpen] = useState<boolean>(false);
   const [wpAuthModalOpen, setWpAuthModalOpen] = useState<boolean>(false);
   const [geoStatus, setGeoStatus] = useState<GeoStatus | null>(wpAuthService.getCachedGeoStatus());
   const [surfNotice, setSurfNotice] = useState<string>('');
+  const [brandLogo, setBrandLogo] = useState<BrandLogoConfig>(() => loadStoredBrandLogo());
+
+  // Apply browser favicon whenever custom logo changes
+  useEffect(() => {
+    applyBrandFavicon(brandLogo.logoDataUrl);
+  }, [brandLogo.logoDataUrl]);
+
+  // Pull global branding logo from WordPress Bridge (public endpoint) on mount
+  useEffect(() => {
+    if (wpAuthService.getConfig().authMode !== 'bridge') return;
+    wpAuthService.fetchBranding().then((remote) => {
+      if (remote) {
+        setBrandLogo(remote);
+        saveStoredBrandLogo(remote);
+      }
+    });
+  }, []);
+
+  const handleSaveBrandLogo = async (
+    nextConfig: BrandLogoConfig
+  ): Promise<{ ok: boolean; message?: string }> => {
+    setBrandLogo(nextConfig);
+    saveStoredBrandLogo(nextConfig);
+
+    if (wpAuthService.isLiveBridgeActive()) {
+      const res = await wpAuthService.saveBranding(nextConfig);
+      if (res.ok && res.branding) {
+        setBrandLogo(res.branding);
+        saveStoredBrandLogo(res.branding);
+        return { ok: true, message: res.message };
+      }
+      return {
+        ok: false,
+        message:
+          res.message ||
+          'Logo tersimpan di browser ini, tetapi gagal menyinkronkan ke WordPress Bridge (pastikan plugin v1.4.0 aktif).',
+      };
+    }
+
+    return { ok: true, message: 'Logo berhasil diterapkan!' };
+  };
 
   // Sync users to localStorage
   useEffect(() => {
@@ -830,6 +882,7 @@ export default function App() {
       <Suspense fallback={<div className="min-h-screen bg-slate-950" />}>
         <LandingPage
           currentUser={user}
+          brandLogo={brandLogo}
           isLiveConnected={wpAuthService.isLiveBridgeActive()}
           onEnterWorkspace={handleEnterWorkspace}
           onAuthenticatedUser={(authedUser) => {
@@ -856,6 +909,7 @@ export default function App() {
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
         user={user}
+        brandLogo={brandLogo}
         isSurfing={currentTab === 'autosurf'}
         onToggleSurfing={() => {
           if (currentTab === 'autosurf') {
@@ -1048,8 +1102,19 @@ export default function App() {
             onSwitchUser={handleSwitchUser}
             onReturnToAdmin={handleReturnToAdmin}
             onOpenWordPressAuth={() => setWpAuthModalOpen(true)}
+            onOpenBrandLogo={() => setBrandLogoModalOpen(true)}
             onOpenHelp={() => setCurrentTab('help')}
             onLogout={handleWordPressLogout}
+          />
+        )}
+
+        {brandLogoModalOpen && user.role === 'admin' && (
+          <BrandLogoModal
+            isOpen={brandLogoModalOpen}
+            onClose={() => setBrandLogoModalOpen(false)}
+            brandLogo={brandLogo}
+            isLiveConnected={wpAuthService.isLiveBridgeActive()}
+            onSaveBrandLogo={handleSaveBrandLogo}
           />
         )}
 
@@ -1088,7 +1153,7 @@ export default function App() {
       <footer className="border-t border-slate-900 bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-300">{APP_NAME}</span>
+            <BrandMark brandLogo={brandLogo} size="footer" />
             <span>·</span>
             <span>{APP_CONFIG.tagline}</span>
           </div>

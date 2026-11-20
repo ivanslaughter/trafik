@@ -1,4 +1,5 @@
 import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, WebsiteProbeResult, GeoStatus } from '../types';
+import { BrandLogoConfig } from '../utils/logoBranding';
 
 export type WordPressAuthMode = 'bridge' | 'simulated';
 
@@ -657,6 +658,43 @@ class WordPressAuthService {
       localStorage.removeItem('tn_wp_admin_return_token');
     }
     return this.fetchMe();
+  }
+
+  public async fetchBranding(): Promise<BrandLogoConfig | null> {
+    if (this.config.authMode !== 'bridge') return null;
+    const res = await this.request<{ branding?: BrandLogoConfig | null }>(
+      '/branding',
+      { method: 'GET' },
+      false
+    );
+    return res.ok && res.data?.branding ? res.data.branding : null;
+  }
+
+  public async saveBranding(
+    branding: BrandLogoConfig
+  ): Promise<{ ok: boolean; branding?: BrandLogoConfig; message?: string }> {
+    if (!this.isLiveBridgeActive()) {
+      return { ok: true, branding };
+    }
+    const res = await this.request<{ success: boolean; branding: BrandLogoConfig; message?: string }>(
+      '/branding',
+      {
+        method: 'POST',
+        body: JSON.stringify(branding),
+      },
+      true
+    );
+    if (!res.ok || !res.data?.branding) {
+      return {
+        ok: false,
+        message: res.error || 'Gagal menyimpan logo ke WordPress Bridge.',
+      };
+    }
+    return {
+      ok: true,
+      branding: res.data.branding,
+      message: res.data.message || 'Logo tersimpan di database WordPress Bridge.',
+    };
   }
 
   public logout() {

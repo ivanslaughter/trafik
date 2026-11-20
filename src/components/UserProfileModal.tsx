@@ -8,6 +8,7 @@ import {
   Globe,
   BookOpen,
   ShieldCheck,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { UserProfile, GeoStatus } from '../types';
 
@@ -23,6 +24,7 @@ interface UserProfileModalProps {
   onSwitchUser: (userId: string) => void;
   onReturnToAdmin?: () => void;
   onOpenWordPressAuth?: () => void;
+  onOpenBrandLogo?: () => void;
   onOpenHelp?: () => void;
   onLogout?: () => void;
 }
@@ -39,6 +41,7 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
   onSwitchUser,
   onReturnToAdmin,
   onOpenWordPressAuth,
+  onOpenBrandLogo,
   onOpenHelp,
   onLogout,
 }) => {
@@ -206,6 +209,23 @@ export const UserProfileModal: React.FC<UserProfileModalProps> = ({
                 <span>Pusat Bantuan & Panduan Penggunaan</span>
               </div>
               <span className="text-[10px] text-emerald-400 font-mono">Buka →</span>
+            </button>
+          )}
+
+          {isAdmin && onOpenBrandLogo && (
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onOpenBrandLogo();
+              }}
+              className="w-full py-2.5 px-3 rounded-xl border border-cyan-800/60 bg-cyan-950/30 hover:bg-cyan-900/40 text-cyan-300 text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer"
+            >
+              <div className="flex items-center gap-2">
+                <ImageIcon className="w-4 h-4 text-cyan-400" />
+                <span>Logo &amp; Branding Portal (Upload SVG / PNG / WebP)</span>
+              </div>
+              <span className="text-[10px] text-cyan-400 font-mono">Atur →</span>
             </button>
           )}
 

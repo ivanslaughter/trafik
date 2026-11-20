@@ -1,12 +1,14 @@
 import React from 'react';
 import { Play, Square, Sparkles, User, ShieldCheck } from 'lucide-react';
 import { UserProfile } from '../types';
-import { APP_NAME } from '../config/appConfig';
+import { BrandLogoConfig } from '../utils/logoBranding';
+import { BrandMark } from './BrandMark';
 
 interface NavbarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
   user: UserProfile;
+  brandLogo?: BrandLogoConfig;
   isSurfing: boolean;
   onToggleSurfing: () => void;
   onOpenPricing: () => void;
@@ -17,6 +19,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentTab,
   onSelectTab,
   user,
+  brandLogo,
   isSurfing,
   onToggleSurfing,
   onOpenPricing,
@@ -36,12 +39,12 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-        {/* Zone 1: Single text element Brand Zone wordmark */}
+        {/* Zone 1: Brand Zone logo / wordmark */}
         <button
           onClick={() => onSelectTab('dashboard')}
-          className="text-left font-bold tracking-tight text-white hover:text-emerald-400 transition-colors cursor-pointer text-xl"
+          className="group text-left transition-colors cursor-pointer flex items-center"
         >
-          {APP_NAME}
+          <BrandMark brandLogo={brandLogo} size="header" />
         </button>
 
         {/* Zone 2: 4-6 clean text navigation links */}

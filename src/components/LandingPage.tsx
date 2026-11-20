@@ -19,6 +19,8 @@ import {
 import { APP_NAME, APP_CONFIG } from '../config/appConfig';
 import { UserProfile, GeoStatus } from '../types';
 import { wpAuthService } from '../services/wordpressAuthService';
+import { BrandLogoConfig } from '../utils/logoBranding';
+import { BrandMark } from './BrandMark';
 import heroNetworkImg from '../assets/images/vel_hero_network_1795023164834.webp';
 import regionalTargetingImg from '../assets/images/vel_regional_targeting_1795023164349.webp';
 import anticheatGuardImg from '../assets/images/vel_anticheat_guard_1795023165931.webp';
@@ -27,6 +29,7 @@ import trafficRotationImg from '../assets/images/vel_traffic_rotation_1795023166
 
 interface LandingPageProps {
   currentUser: UserProfile;
+  brandLogo?: BrandLogoConfig;
   isLiveConnected: boolean;
   onEnterWorkspace: (targetTab?: string) => void;
   onAuthenticatedUser: (user: UserProfile) => void;
@@ -99,6 +102,7 @@ const LANDING_FAQS = [
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   currentUser,
+  brandLogo,
   isLiveConnected,
   onEnterWorkspace,
   onAuthenticatedUser,
@@ -217,12 +221,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Strict 3-Zone Top Bar Contract */}
       <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-8 px-4 sm:px-6 lg:px-8">
-          {/* Zone 1: Single-element Brand Wordmark */}
+          {/* Zone 1: Brand Logo / Wordmark */}
           <a
             href="#beranda"
-            className="text-xl font-bold tracking-tight text-white hover:text-emerald-400 transition-colors whitespace-nowrap shrink-0"
+            className="group inline-flex items-center whitespace-nowrap shrink-0"
           >
-            {APP_NAME}
+            <BrandMark brandLogo={brandLogo} size="header" />
           </a>
 
           {/* Zone 2: 5 Single-line Navigation Links */}
@@ -1074,7 +1078,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       <footer className="border-t border-slate-900 bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
         <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
-            <span className="font-semibold text-slate-300">{APP_NAME}</span>
+            <BrandMark brandLogo={brandLogo} size="footer" />
             <span aria-hidden="true">·</span>
             <span>{APP_CONFIG.tagline}</span>
           </div>
