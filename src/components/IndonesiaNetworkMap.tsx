@@ -1268,7 +1268,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
               Peta Distribusi Trafik
             </h3>
             <span className="text-[10px] px-2 py-0.5 rounded-none bg-emerald-950 text-emerald-300 border border-emerald-800/50 font-mono font-semibold">
-              38 Provinsi Resmi · 515 Daerah
+              38 Provinsi Resmi · 514 Kab/Kota
             </span>
           </div>
         </div>
