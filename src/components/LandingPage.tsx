@@ -301,8 +301,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
         {/* 1. Hero Section */}
         <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-12 pb-14 lg:pt-16 lg:pb-20">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
-            {/* Hero Copy (1/3) */}
-            <div className="lg:col-span-4 flex flex-col justify-center">
+            {/* Hero Copy (5/12) */}
+            <div className="lg:col-span-5 flex flex-col justify-center">
               <div className="text-xs font-medium text-emerald-400 mb-3">
                 {PAYMENTS_ENABLED
                   ? 'Jaringan Pertukaran Trafik Indonesia · Terverifikasi Anti-Bot'
@@ -311,7 +311,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
 
               <h1
                 className="font-bold tracking-tight text-slate-100 leading-[1.12] [text-wrap:balance]"
-                style={{ fontSize: 'clamp(2rem, 3.1vw, 3rem)' }}
+                style={{ fontSize: 'clamp(2.1rem, 3.4vw, 3.25rem)' }}
               >
                 Trafik Pengunjung Indonesia Asli untuk Website Anda
               </h1>
@@ -363,8 +363,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
 
-            {/* Hero Animated 38-Province Indonesia SVG with Live Trafik Telemetry (2/3) */}
-            <div className="lg:col-span-8">
+            {/* Hero Animated 38-Province Indonesia SVG with Live Trafik Telemetry (7/12) */}
+            <div className="lg:col-span-7">
               <HeroIndonesiaAnimatedMap />
             </div>
           </div>

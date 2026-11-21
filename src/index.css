@@ -78,6 +78,23 @@
   display: block;
 }
 
+/* Crisp 1px non-scaling browser window frame lines (#Layer_4) */
+.trafik-hero-svg-stage #Layer_4 {
+  opacity: 0.63;
+}
+
+.trafik-hero-svg-stage #Layer_4 path,
+.trafik-hero-svg-stage #Layer_4 line,
+.trafik-hero-svg-stage #Layer_4 polyline,
+.trafik-hero-svg-stage #Layer_4 circle,
+.trafik-hero-svg-stage #Layer_4 rect,
+.trafik-hero-svg-stage #Layer_4 polygon {
+  vector-effect: non-scaling-stroke;
+  stroke-width: 1px;
+  stroke: rgba(226, 232, 240, 0.58);
+  shape-rendering: geometricPrecision;
+}
+
 @keyframes trafikProvinceBreath {
   0%,
   100% {
@@ -167,13 +184,11 @@
   0%,
   100% {
     transform: scale(1);
-    filter: drop-shadow(0 0 6px var(--dev-glow, rgba(16, 185, 129, 0.28)));
-    opacity: 0.9;
+    filter: drop-shadow(0 0 5px var(--dev-glow, rgba(255, 255, 255, 0.14)));
   }
   50% {
-    transform: scale(1.035);
-    filter: drop-shadow(0 0 18px var(--dev-glow-strong, rgba(16, 185, 129, 0.65)));
-    opacity: 1;
+    transform: scale(1.03);
+    filter: drop-shadow(0 0 14px var(--dev-glow-strong, rgba(255, 255, 255, 0.36)));
   }
 }
 
@@ -182,7 +197,7 @@
     stroke-dashoffset: 0;
   }
   100% {
-    stroke-dashoffset: -176;
+    stroke-dashoffset: -160;
   }
 }
 
@@ -191,10 +206,10 @@
     opacity: 0;
   }
   16% {
-    opacity: 0.88;
+    opacity: 0.48;
   }
   80% {
-    opacity: 0.82;
+    opacity: 0.42;
   }
   100% {
     opacity: 0;
@@ -208,19 +223,19 @@
 }
 
 .trafik-hero-device-emitter {
-  fill: var(--dev-color, #10b981);
+  fill: rgba(255, 255, 255, 0.82);
   stroke: #0b1220;
-  stroke-width: 2.2;
+  stroke-width: 2;
   pointer-events: none;
   transform-box: fill-box;
   transform-origin: center;
-  animation: trafikCityGlow 2.4s ease-in-out var(--dev-delay, 0s) infinite;
+  animation: trafikCityGlow 2.6s ease-in-out var(--dev-delay, 0s) infinite;
 }
 
 .trafik-hero-device-ring {
   fill: none;
-  stroke: var(--dev-color, #10b981);
-  stroke-width: 2.8;
+  stroke: rgba(255, 255, 255, 0.52);
+  stroke-width: 2.2;
   pointer-events: none;
   transform-box: fill-box;
   transform-origin: center;
@@ -229,12 +244,11 @@
 
 .trafik-hero-beam {
   fill: none;
-  stroke: var(--beam-color, #22d3ee);
-  stroke-width: 3.4;
+  stroke: rgba(255, 255, 255, 0.92);
+  stroke-width: 2.4;
   stroke-linecap: round;
-  stroke-dasharray: 12 10;
+  stroke-dasharray: 10 10;
   pointer-events: none;
-  filter: drop-shadow(0 0 6px var(--beam-color, #22d3ee));
   animation:
     trafikDashFlow var(--dash-dur, 2.2s) linear infinite,
     trafikBeamLifecycle var(--beam-dur, 4.2s) ease-in-out forwards;
@@ -257,12 +271,12 @@
 
   .trafik-hero-city-ring,
   .trafik-hero-device-ring {
-    opacity: 0.35;
-    transform: scale(1.8);
+    opacity: 0.3;
+    transform: scale(1.7);
   }
 
   .trafik-hero-beam {
-    opacity: 0.55;
+    opacity: 0.35;
   }
 }
 

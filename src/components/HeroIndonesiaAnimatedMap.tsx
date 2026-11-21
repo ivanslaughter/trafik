@@ -46,21 +46,22 @@ interface DeviceAnchor {
 }
 
 /**
- * Exact anchor points & child element slices inside #Layer_2 of the uploaded SVG:
- * - Mobile Phone (left): children 0..5, top-center (997.4, 1202)
- * - Laptop (center): children 6..9, top-center (1439.6, 1201)
- * - Tablet (right): children 10..11, top-center (1867.9, 1187)
+ * Exact anchor points & child element slices inside #Layer_2 of the uploaded SVG.
+ * Emitter dot & dashed line start sit slightly outside above each device's top edge:
+ * - Mobile Phone (left): top edge y≈1202 -> emitter at (997.4, 1172)
+ * - Laptop (center): top edge y≈1201 -> emitter at (1439.6, 1171)
+ * - Tablet (right): top edge y≈1187 -> emitter at (1867.9, 1157)
  */
 const DEVICE_ANCHORS: DeviceAnchor[] = [
   {
     id: 'mobile',
     x: 997.4,
-    y: 1202,
+    y: 1172,
     childStart: 0,
     childEnd: 5,
-    color: '#10b981',
-    glow: 'rgba(16, 185, 129, 0.32)',
-    glowStrong: 'rgba(16, 185, 129, 0.72)',
+    color: '#ffffff',
+    glow: 'rgba(255, 255, 255, 0.14)',
+    glowStrong: 'rgba(255, 255, 255, 0.38)',
     delay: '0s',
     dur: '3.1s',
     preferMinX: 300,
@@ -69,12 +70,12 @@ const DEVICE_ANCHORS: DeviceAnchor[] = [
   {
     id: 'laptop',
     x: 1439.6,
-    y: 1201,
+    y: 1171,
     childStart: 6,
     childEnd: 9,
-    color: '#22d3ee',
-    glow: 'rgba(34, 211, 238, 0.32)',
-    glowStrong: 'rgba(34, 211, 238, 0.72)',
+    color: '#ffffff',
+    glow: 'rgba(255, 255, 255, 0.14)',
+    glowStrong: 'rgba(255, 255, 255, 0.38)',
     delay: '-1.05s',
     dur: '3.5s',
     preferMinX: 780,
@@ -83,12 +84,12 @@ const DEVICE_ANCHORS: DeviceAnchor[] = [
   {
     id: 'tablet',
     x: 1867.9,
-    y: 1187,
+    y: 1157,
     childStart: 10,
     childEnd: 11,
-    color: '#818cf8',
-    glow: 'rgba(129, 140, 248, 0.32)',
-    glowStrong: 'rgba(129, 140, 248, 0.74)',
+    color: '#ffffff',
+    glow: 'rgba(255, 255, 255, 0.14)',
+    glowStrong: 'rgba(255, 255, 255, 0.38)',
     delay: '-2.1s',
     dur: '3.3s',
     preferMinX: 1400,
@@ -401,10 +402,9 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
           layer3.setAttribute('display', 'none');
         }
 
-        // Subtly refine browser frame chrome (Layer 4) and device silhouettes (Layer 2) for dark-slate balance
+        // Keep browser frame chrome (Layer 4) non-interactive and at full sharpness (styled via 1px non-scaling-stroke)
         const layer4 = svgEl.querySelector<SVGElement>('#Layer_4');
         if (layer4) {
-          layer4.style.opacity = '0.72';
           layer4.style.pointerEvents = 'none';
         }
 
@@ -432,22 +432,20 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
                 }
               }
 
-              // Add glowing emitter ring + node at top-center of each device
+              // Add clean emitter ring + dot slightly outside above each device's top edge
               const emitterRing = doc.createElementNS(SVG_NS, 'circle');
               emitterRing.setAttribute('cx', String(dev.x));
               emitterRing.setAttribute('cy', String(dev.y));
-              emitterRing.setAttribute('r', '7.5');
+              emitterRing.setAttribute('r', '6.5');
               emitterRing.setAttribute('class', 'trafik-hero-device-ring');
-              emitterRing.style.setProperty('--dev-color', dev.color);
               emitterRing.style.setProperty('--dev-delay', dev.delay);
               g.appendChild(emitterRing);
 
               const emitterDot = doc.createElementNS(SVG_NS, 'circle');
               emitterDot.setAttribute('cx', String(dev.x));
               emitterDot.setAttribute('cy', String(dev.y));
-              emitterDot.setAttribute('r', '6.5');
+              emitterDot.setAttribute('r', '5.5');
               emitterDot.setAttribute('class', 'trafik-hero-device-emitter');
-              emitterDot.style.setProperty('--dev-color', dev.color);
               emitterDot.style.setProperty('--dev-delay', dev.delay);
               g.appendChild(emitterDot);
 
@@ -623,36 +621,19 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
       return pool[Math.floor(Math.random() * pool.length)];
     };
 
-    // Build graceful upward quadratic Bezier arc from device anchor -> target capital city
+    // Build crisp straight dashed line from device emitter dot (slightly outside top edge) -> target capital city
     const createBeamPath = (dev: DeviceAnchor, meta: ProvinceMeta, beamDurMs: number): SVGPathElement | null => {
       const target = cityCoordsRef.current.get(meta.citySvgId);
       if (!target) return null;
 
-      const dx = target.x - dev.x;
-      const dy = target.y - dev.y;
-      const dist = Math.hypot(dx, dy);
-
-      // Curvature bends gracefully outward/upward relative to horizontal span
-      const midX = (dev.x + target.x) * 0.5;
-      const midY = (dev.y + target.y) * 0.5;
-      const archLift = Math.min(260, Math.max(95, dist * 0.24));
-      const ctrlX = midX + (dx >= 0 ? -Math.min(110, Math.abs(dx) * 0.14) : Math.min(110, Math.abs(dx) * 0.14));
-      const ctrlY = Math.min(dev.y - 80, midY - archLift);
-
       const path = document.createElementNS(SVG_NS, 'path');
       path.setAttribute(
         'd',
-        `M ${dev.x.toFixed(1)} ${dev.y.toFixed(1)} Q ${ctrlX.toFixed(1)} ${ctrlY.toFixed(1)} ${target.x.toFixed(1)} ${target.y.toFixed(1)}`
+        `M ${dev.x.toFixed(1)} ${dev.y.toFixed(1)} L ${target.x.toFixed(1)} ${target.y.toFixed(1)}`
       );
       path.setAttribute('class', 'trafik-hero-beam');
 
-      // Use target city's current luminous palette color (fallback to device color)
-      const cityColorIdx = cityColorIndexRef.current.get(meta.citySvgId);
-      const beamColor =
-        cityColorIdx !== undefined ? CITY_PALETTE[cityColorIdx % CITY_PALETTE.length] : dev.color;
-
       const dashDurSec = (1.6 + Math.random() * 1.1).toFixed(2);
-      path.style.setProperty('--beam-color', beamColor);
       path.style.setProperty('--dash-dur', `${dashDurSec}s`);
       path.style.setProperty('--beam-dur', `${(beamDurMs / 1000).toFixed(2)}s`);
 
@@ -806,11 +787,6 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
     return { left, top };
   }, [hovered]);
 
-  const activeProvinceCount = useMemo(() => {
-    if (!liveStats?.provinces) return 0;
-    return Object.values(liveStats.provinces).filter((p) => p.surfers > 0 || p.dailyHits > 0).length;
-  }, [liveStats]);
-
   return (
     <div
       ref={containerRef}
@@ -818,18 +794,6 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
       onPointerLeave={handlePointerLeave}
       className="relative w-full flex flex-col justify-between bg-transparent"
     >
-      {/* Top micro header strip */}
-      <div className="relative z-10 flex items-center justify-between gap-3 pb-1 text-[11px] text-slate-400">
-        <span className="font-mono uppercase tracking-[0.14em] text-slate-300">
-          Jaringan 38 Provinsi · Indonesia
-        </span>
-        <span className="font-mono tabular-nums text-emerald-400">
-          {liveStats
-            ? `${activeProvinceCount > 0 ? activeProvinceCount : 38} Node Aktif`
-            : 'Live Data'}
-        </span>
-      </div>
-
       {/* Inline Animated 38-Province SVG Canvas — Enlarged via Negative Margins */}
       <div className="relative z-0 -mx-6 sm:-mx-10 lg:-mx-14 -my-5 sm:-my-8 lg:-my-10">
         {!svgError ? (
