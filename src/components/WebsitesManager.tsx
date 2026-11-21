@@ -27,7 +27,7 @@ import { INDONESIAN_REGIONS } from '../data/mockData';
 import { auditWebsiteCompliance } from '../services/complianceAuditEngine';
 import { wpAuthService } from '../services/wordpressAuthService';
 import { APP_CONFIG, APP_NAME } from '../config/appConfig';
-import { VwsRowDivider, VwsBottomLine } from './VwsSmartLine';
+import { VwsRowDivider, VwsBottomLine, VwsTopLine, VwsGridFrame, VwsSmartLine, VwsColumnDivider } from './VwsSmartLine';
 import {
   ClientUrlValidationResult,
   validateWebsiteUrlClientSide,
@@ -451,16 +451,48 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          {websites.map((site) => {
+        <div
+          className={`relative grid grid-cols-1 ${
+            websites.length > 1 ? 'lg:grid-cols-2' : ''
+          } bg-slate-900/70`}
+        >
+          <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
+          {websites.length > 1 && (
+            <VwsSmartLine
+              orientation="vertical"
+              offsetStart="26px"
+              offsetEnd="26px"
+              className="hidden lg:block absolute left-1/2 z-10"
+              style={{ top: '-18px', height: 'calc(100% + 36px)' }}
+            />
+          )}
+          {websites.map((site, siteIdx) => {
             const isPaused = site.status === 'paused';
             const isDepleted = site.allocatedPoints < site.pointsCostPerVisit;
+            const isLeftCol = siteIdx % 2 === 0;
 
             return (
               <div
                 key={site.id}
-                className="rounded-xl border border-slate-800 bg-slate-900/70 p-5 flex flex-col justify-between hover:border-slate-700/80 transition-all"
+                className="vws-grid-cell p-5 sm:p-6 flex flex-col justify-between hover:bg-slate-900/90 transition-colors"
               >
+                {/* Mobile single-column row divider */}
+                {siteIdx > 0 && (
+                  <VwsTopLine bleedPx={18} className="lg:hidden" />
+                )}
+                {/* Desktop 2-column continuous row divider with outer fade bleed */}
+                {siteIdx >= 2 && (
+                  <VwsSmartLine
+                    orientation="horizontal"
+                    offsetStart={isLeftCol ? '26px' : '0px'}
+                    offsetEnd={isLeftCol ? '0px' : '26px'}
+                    className="hidden lg:block absolute top-0 z-10"
+                    style={{
+                      left: isLeftCol ? '-18px' : '0px',
+                      right: isLeftCol ? '0px' : '-18px',
+                    }}
+                  />
+                )}
                 <div>
                   {/* Top Row: Title, Category, Status */}
                   <div className="flex items-start justify-between gap-3">
@@ -551,20 +583,23 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
                   </div>
 
                   {/* Metrics bar */}
-                  <div className="mt-3 p-3 rounded-lg bg-slate-950/60 border border-slate-800/60 grid grid-cols-3 gap-2 text-center text-xs">
-                    <div>
+                  <div className="relative mt-4 bg-slate-950/60 grid grid-cols-3 text-center text-xs">
+                    <VwsGridFrame hasBackground overhangPx={8} bleedPx={8} />
+                    <div className="vws-grid-cell p-3">
                       <span className="text-slate-500 block text-[11px]">Hari Ini</span>
                       <span className="font-mono tabular-nums font-semibold text-slate-100">
                         {site.hitsDeliveredToday} / {site.dailyHitLimit}
                       </span>
                     </div>
-                    <div>
+                    <div className="vws-grid-cell p-3">
+                      <VwsColumnDivider visibleFrom="always" overhangPx={8} />
                       <span className="text-slate-500 block text-[11px]">Total Kunjungan</span>
                       <span className="font-mono tabular-nums font-semibold text-slate-100">
                         {site.totalHitsDelivered}
                       </span>
                     </div>
-                    <div>
+                    <div className="vws-grid-cell p-3">
+                      <VwsColumnDivider visibleFrom="always" overhangPx={8} />
                       <span className="text-slate-500 block text-[11px]">Sisa Poin Situs</span>
                       <span className="font-mono tabular-nums font-semibold text-emerald-400">
                         {site.allocatedPoints.toLocaleString('id-ID')}
@@ -619,6 +654,17 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
               </div>
             );
           })}
+          {websites.length > 2 && websites.length % 2 === 1 && (
+            <div aria-hidden="true" className="hidden lg:block relative">
+              <VwsSmartLine
+                orientation="horizontal"
+                offsetStart="0px"
+                offsetEnd="26px"
+                className="absolute top-0 z-10"
+                style={{ left: '0px', right: '-18px' }}
+              />
+            </div>
+          )}
         </div>
       )}
 

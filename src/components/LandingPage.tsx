@@ -52,7 +52,7 @@ const QUICK_GUIDE_STEPS = [
   {
     step: '01',
     title: 'Buat Akun Member',
-    summary: 'Daftar gratis dengan email aktif Anda dan langsung terima 1.500 poin awal tanpa perlu kartu kredit.',
+    summary: 'Register gratis dengan email aktif Anda dan langsung terima 1.500 poin awal tanpa perlu kartu kredit.',
     tip: 'Gunakan email aktif agar progres poin dan laporan kampanye tersimpan aman.',
   },
   {
@@ -98,7 +98,7 @@ const LANDING_FAQS = [
     id: 'faq-existing',
     question: 'Saya sudah terdaftar sebagai member, di mana saya bisa membaca panduan teknis lengkap?',
     answer:
-      'Setelah masuk ke dasbor member, Anda dapat membuka menu Pusat Bantuan & Panduan Member kapan saja melalui tautan footer atau menu profil untuk melihat tutorial langkah demi langkah, aturan anti-cheat, dan solusi kendala umum.',
+      'Setelah login ke dasbor member, Anda dapat membuka menu Pusat Bantuan & Panduan Member kapan saja melalui tautan footer atau menu profil untuk melihat tutorial langkah demi langkah, aturan anti-cheat, dan solusi kendala umum.',
   },
 ];
 
@@ -134,7 +134,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   useEffect(() => {
     if (initialScrollToAuth) {
       setTimeout(() => {
-        document.getElementById('daftar-masuk')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.getElementById('masuk')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 80);
     }
   }, [initialScrollToAuth]);
@@ -221,7 +221,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
     setFormSuccess(
       entryMode === 'register'
         ? 'Akun berhasil dibuat dengan bonus 1.500 poin awal. Mengarahkan ke dasbor...'
-        : 'Berhasil masuk ke akun Anda. Mengarahkan ke dasbor...'
+        : 'Berhasil login ke akun Anda. Mengarahkan ke dasbor...'
     );
     onAuthenticatedUser(localUser);
     setTimeout(() => onEnterWorkspace('dashboard'), 550);
@@ -289,7 +289,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 onClick={() => scrollToAuth('login')}
                 className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-500 rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
-                Masuk / Daftar
+                Login / Register
               </button>
             )}
           </div>
@@ -329,7 +329,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   }}
                   className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors whitespace-nowrap shrink-0 cursor-pointer"
                 >
-                  <span>{isLiveConnected ? 'Lanjut ke Dasbor Member' : 'Daftar Gratis — Bonus 1.500 Poin'}</span>
+                  <span>{isLiveConnected ? 'Lanjut ke Dasbor Member' : 'Register Gratis — Bonus 1.500 Poin'}</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
@@ -348,7 +348,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   onClick={() => scrollToAuth('login')}
                   className="text-emerald-400 hover:text-emerald-300 underline underline-offset-4 font-medium cursor-pointer"
                 >
-                  Masuk ke akun Anda
+                  Login ke akun Anda
                 </button>
                 <span aria-hidden="true">·</span>
                 <a
@@ -757,7 +757,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 onClick={() => scrollToAuth('register')}
                 className="text-xs font-semibold text-emerald-400 hover:text-emerald-300 underline underline-offset-4 cursor-pointer self-start sm:self-auto"
               >
-                Mulai daftar & coba gratis →
+                Mulai Register & coba gratis →
               </button>
             </div>
 
@@ -944,7 +944,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 onClick={() => onEnterWorkspace('dashboard')}
                 className="mt-8 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold text-center transition-colors cursor-pointer"
               >
-                Masuk & Lihat Detail Paket Pro
+                Login & Lihat Detail Paket Pro
               </button>
             </div>
           </div>
@@ -959,7 +959,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Siap mendatangkan pengunjung ke website Anda?
               </h2>
               <p className="text-sm text-slate-400 mt-3 leading-relaxed">
-                Buat akun baru dalam hitungan detik untuk mendapatkan 1.500 poin awal, atau masuk menggunakan akun member yang sudah terdaftar.
+                Buat akun baru dalam hitungan detik untuk mendapatkan 1.500 poin awal, atau login menggunakan akun member yang sudah terdaftar.
               </p>
 
               <div className="mt-6 space-y-3 text-xs text-slate-300">
@@ -996,7 +996,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     }`}
                   >
                     <UserPlus className="w-3.5 h-3.5" />
-                    <span>Daftar Member Baru</span>
+                    <span>Register</span>
                   </button>
                   <button
                     type="button"
@@ -1012,7 +1012,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     }`}
                   >
                     <LogIn className="w-3.5 h-3.5" />
-                    <span>Masuk Member Lama</span>
+                    <span>Login</span>
                   </button>
                 </div>
 
@@ -1023,7 +1023,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       <strong className="text-amber-100 block">Portal Khusus Pengguna Indonesia ({geoStatus.countryCode})</strong>
                       <span>
                         {geoStatus.message || 'Pendaftaran dan penggunaan member hanya tersedia dari koneksi IP Indonesia tanpa VPN luar negeri.'}{' '}
-                        {entryMode === 'login' ? 'Akun Administrator tetap dapat masuk via bypass.' : 'Gunakan tab Masuk jika Anda Administrator.'}
+                        {entryMode === 'login' ? 'Akun Administrator tetap dapat login via bypass.' : 'Gunakan tab Login jika Anda Administrator.'}
                       </span>
                     </div>
                   </div>
@@ -1121,8 +1121,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                         {isSubmitting
                           ? 'Memproses...'
                           : entryMode === 'register'
-                          ? 'Buat Akun & Masuk Dasbor'
-                          : 'Masuk ke Dasbor'}
+                          ? 'Register & Login Dasbor'
+                          : 'Login ke Dasbor'}
                       </span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
@@ -1137,36 +1137,39 @@ export const LandingPage: React.FC<LandingPageProps> = ({
       {/* Quiet Footer */}
       <footer className="relative bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
         <VwsTopLine bleed={false} />
-        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <BrandMark brandLogo={brandLogo} size="footer" />
-            <span aria-hidden="true">·</span>
-            <span>{APP_CONFIG.tagline}</span>
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col items-center sm:items-start gap-1.5">
+              <BrandMark brandLogo={brandLogo} size="footer" />
+              <span>{APP_CONFIG.tagline}</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-5 text-slate-400">
+              <a href="#cara-kerja" className="hover:text-slate-200 transition-colors">
+                Cara Kerja
+              </a>
+              <a href="#panduan" className="hover:text-slate-200 transition-colors">
+                Panduan
+              </a>
+              <a href="#keamanan" className="hover:text-slate-200 transition-colors">
+                Anti-Cheat
+              </a>
+              <a href="#paket" className="hover:text-slate-200 transition-colors">
+                Paket
+              </a>
+              <button
+                onClick={() => onEnterWorkspace('help')}
+                className="hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                Pusat Bantuan
+              </button>
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-5 text-slate-400">
-            <a href="#cara-kerja" className="hover:text-slate-200 transition-colors">
-              Cara Kerja
-            </a>
-            <a href="#panduan" className="hover:text-slate-200 transition-colors">
-              Panduan
-            </a>
-            <a href="#keamanan" className="hover:text-slate-200 transition-colors">
-              Anti-Cheat
-            </a>
-            <a href="#paket" className="hover:text-slate-200 transition-colors">
-              Paket
-            </a>
-            <button
-              onClick={() => onEnterWorkspace('help')}
-              className="hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              Pusat Bantuan
-            </button>
-          </div>
+          <VwsRowDivider className="my-5" />
 
-          <div className="text-[11px] text-slate-600">
-            © {APP_CONFIG.year} {APP_NAME}. Dilindungi undang-undang.
+          <div className="text-[11px] text-slate-500 text-center sm:text-left">
+            © {APP_CONFIG.year} <strong className="font-bold text-slate-300">{APP_NAME}</strong>. Dilindungi undang-undang.
           </div>
         </div>
       </footer>

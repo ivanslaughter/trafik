@@ -9,11 +9,11 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertTriangle,
-  ChevronDown,
 } from 'lucide-react';
 import { APP_NAME } from '../config/appConfig';
 import { UserProfile } from '../types';
 import { VwsGridFrame, VwsRowDivider, VwsSmartLine, VwsTopLine } from './VwsSmartLine';
+import { FAQAccordion } from './FAQAccordion';
 
 interface HelpGuideViewProps {
   user: UserProfile;
@@ -143,24 +143,6 @@ const GUIDE_ARTICLES: GuideArticle[] = [
   },
 ];
 
-const TROUBLESHOOTING_FAQS = [
-  {
-    id: 'ts-no-hits',
-    q: 'Website saya berstatus Aktif, tetapi kunjungan belum bertambah. Apa penyebabnya?',
-    a: 'Periksa tiga hal utama: (1) pastikan sisa Poin Dialokasikan pada website masih mencukupi minimal 1 kunjungan, (2) pastikan batas hit harian belum penuh hari ini, dan (3) pastikan status Audit Kepatuhan bernilai Disetujui (Approved).',
-  },
-  {
-    id: 'ts-timer-pause',
-    q: 'Mengapa timer selancar sering berhenti di tengah jalan?',
-    a: 'Timer berhenti jika Anda beralih ke tab browser lain, meminimalkan jendela, atau tidak ada pergerakan kursor sama sekali dalam durasi panjang. Kembali ke tab Selancar Trafik untuk melanjutkan hitungan.',
-  },
-  {
-    id: 'ts-suspended',
-    q: 'Apa yang harus dilakukan jika muncul spanduk Akun Ditangguhkan?',
-    a: 'Penangguhan terjadi bila sistem mendeteksi sesi multi-tab berulang, manipulasi waktu browser, atau pengisian form tanpa interaksi manusia. Periksa catatan alasan pada spanduk atas dan hubungi administrator untuk peninjauan ulang.',
-  },
-];
-
 export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
   user,
   onStartSurfing,
@@ -172,7 +154,6 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
 }) => {
   const [activeCategory, setActiveCategory] = useState<GuideCategoryId>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [openFaq, setOpenFaq] = useState<string>(TROUBLESHOOTING_FAQS[0].id);
 
   const filteredArticles = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
@@ -399,48 +380,11 @@ export const HelpGuideView: React.FC<HelpGuideViewProps> = ({
         </div>
       )}
 
-      {/* Troubleshooting Accordion */}
-      <div className="relative bg-slate-900/60 p-6 sm:p-8">
-        <VwsGridFrame hasBackground overhangPx={16} bleedPx={16} />
-        <h2 className="text-lg font-bold text-slate-100">
-          Pemecahan Masalah Umum (Troubleshooting)
-        </h2>
-        <p className="text-xs text-slate-400 mt-1 mb-5">
-          Solusi cepat apabila terjadi jeda timer, kampanye tidak berputar, atau status akun ditangguhkan.
-        </p>
-
-        <div>
-          {TROUBLESHOOTING_FAQS.map((item, faqIdx) => {
-            const isOpen = openFaq === item.id;
-            return (
-              <React.Fragment key={item.id}>
-                {faqIdx > 0 && <VwsRowDivider />}
-                <div className="py-4 first:pt-0 last:pb-0">
-                  <button
-                    type="button"
-                    onClick={() => setOpenFaq(isOpen ? '' : item.id)}
-                    className="w-full flex items-center justify-between gap-4 text-left cursor-pointer group"
-                  >
-                    <span className="text-sm font-semibold text-slate-100 group-hover:text-emerald-400 transition-colors">
-                      {item.q}
-                    </span>
-                    <ChevronDown
-                      className={`w-4 h-4 text-slate-400 shrink-0 transition-transform duration-200 ${
-                        isOpen ? 'rotate-180 text-emerald-400' : ''
-                      }`}
-                    />
-                  </button>
-                  {isOpen && (
-                    <p className="mt-2.5 text-xs sm:text-sm text-slate-400 leading-relaxed max-w-4xl">
-                      {item.a}
-                    </p>
-                  )}
-                </div>
-              </React.Fragment>
-            );
-          })}
-        </div>
-      </div>
+      {/* FAQ Accordion: Anti-Cheat & Poin */}
+      <FAQAccordion
+        searchQuery={searchQuery}
+        onActionClick={handleActionClick}
+      />
     </div>
   );
 };

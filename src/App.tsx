@@ -19,7 +19,7 @@ import { HelpCircle, Ban, MapPin, ArrowLeft, LogIn } from 'lucide-react';
 import { APP_NAME, APP_CONFIG, getPageTitle } from './config/appConfig';
 import { AntiCheatToastContainer, AntiCheatToastItem } from './components/AntiCheatToast';
 import { BrandMark } from './components/BrandMark';
-import { VwsTopLine } from './components/VwsSmartLine';
+import { VwsTopLine, VwsRowDivider } from './components/VwsSmartLine';
 import {
   BrandLogoConfig,
   loadStoredBrandLogo,
@@ -961,7 +961,7 @@ export default function App() {
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors cursor-pointer shrink-0"
             >
               <LogIn className="w-3.5 h-3.5" />
-              <span>Masuk / Daftar Gratis</span>
+              <span>Login / Register Gratis</span>
             </button>
           </div>
         </div>
@@ -998,7 +998,7 @@ export default function App() {
         <div className="bg-amber-950/80 border-b border-amber-700/60 px-4 py-2.5 text-xs text-amber-200">
           <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
             <span>
-              Mode Peninjauan Admin: Anda sedang masuk sebagai <strong>{user.name}</strong> ({user.email}).
+              Mode Peninjauan Admin: Anda sedang login sebagai <strong>{user.name}</strong> ({user.email}).
             </span>
             <button
               onClick={handleReturnToAdmin}
@@ -1198,63 +1198,66 @@ export default function App() {
       {/* Clean, Understated Footer conforming to Anti-Slop Guidelines */}
       <footer className="relative bg-slate-950 py-8 px-4 sm:px-6 lg:px-8 text-xs text-slate-500">
         <VwsTopLine bleed={false} />
-        <div className="mx-auto max-w-7xl flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
-            <BrandMark brandLogo={brandLogo} size="footer" />
-            <span>·</span>
-            <span>{APP_CONFIG.tagline}</span>
-          </div>
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col items-center sm:items-start gap-1.5">
+              <BrandMark brandLogo={brandLogo} size="footer" />
+              <span>{APP_CONFIG.tagline}</span>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-4 text-slate-400">
-            <button
-              onClick={() => handleReturnToLanding(false)}
-              className="hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              Beranda
-            </button>
-            <button
-              onClick={() => setCurrentTab('audit')}
-              className="hover:text-slate-200 transition-colors cursor-pointer text-rose-400/90 font-medium"
-            >
-              Audit Kepatuhan (Anti-Judi/18+)
-            </button>
-            {user.role === 'admin' && (
+            <div className="flex flex-wrap items-center gap-4 text-slate-400">
               <button
-                onClick={() => setCurrentTab('users')}
+                onClick={() => handleReturnToLanding(false)}
                 className="hover:text-slate-200 transition-colors cursor-pointer"
               >
-                Manajemen Pengguna
+                Beranda
               </button>
-            )}
-            <button
-              onClick={() => setCurrentTab('anticheat')}
-              className="hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              Integritas Anti-Cheat
-            </button>
-            <button
-              onClick={() => setCurrentTab('referral')}
-              className="hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              Program Afiliasi
-            </button>
-            <button
-              onClick={() => setPricingModalOpen(true)}
-              className="hover:text-slate-200 transition-colors cursor-pointer"
-            >
-              Tarif & Beli Poin
-            </button>
-            <button
-              onClick={() => setCurrentTab('help')}
-              className="hover:text-slate-200 transition-colors cursor-pointer inline-flex items-center gap-1 text-emerald-400/90 font-medium"
-            >
-              <HelpCircle className="w-3.5 h-3.5" />
-              <span>Panduan & Bantuan</span>
-            </button>
+              <button
+                onClick={() => setCurrentTab('audit')}
+                className="hover:text-slate-200 transition-colors cursor-pointer text-rose-400/90 font-medium"
+              >
+                Audit Kepatuhan (Anti-Judi/18+)
+              </button>
+              {user.role === 'admin' && (
+                <button
+                  onClick={() => setCurrentTab('users')}
+                  className="hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  Manajemen Pengguna
+                </button>
+              )}
+              <button
+                onClick={() => setCurrentTab('anticheat')}
+                className="hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                Integritas Anti-Cheat
+              </button>
+              <button
+                onClick={() => setCurrentTab('referral')}
+                className="hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                Program Afiliasi
+              </button>
+              <button
+                onClick={() => setPricingModalOpen(true)}
+                className="hover:text-slate-200 transition-colors cursor-pointer"
+              >
+                Tarif & Beli Poin
+              </button>
+              <button
+                onClick={() => setCurrentTab('help')}
+                className="hover:text-slate-200 transition-colors cursor-pointer inline-flex items-center gap-1 text-emerald-400/90 font-medium"
+              >
+                <HelpCircle className="w-3.5 h-3.5" />
+                <span>Panduan & Bantuan</span>
+              </button>
+            </div>
           </div>
 
-          <div className="text-[11px] text-slate-600">
-            © {APP_CONFIG.year} {APP_NAME}. Dilindungi undang-undang.
+          <VwsRowDivider className="my-5" />
+
+          <div className="text-[11px] text-slate-500 text-center sm:text-left">
+            © {APP_CONFIG.year} <strong className="font-bold text-slate-300">{APP_NAME}</strong>. Dilindungi undang-undang.
           </div>
         </div>
       </footer>

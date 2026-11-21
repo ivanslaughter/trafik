@@ -479,7 +479,7 @@ export const UserManagementView: React.FC<UserManagementViewProps> = ({
                             <button
                               onClick={() => onSwitchUser(u.id)}
                               className="px-2 py-1 rounded bg-slate-800/60 hover:bg-emerald-600 hover:text-white text-slate-400 text-[11px] transition-colors cursor-pointer"
-                              title="Masuk sebagai user ini (Switch Session)"
+                              title="Login sebagai user ini (Switch Session)"
                             >
                               Login Sbg
                             </button>

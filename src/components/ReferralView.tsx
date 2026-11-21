@@ -48,7 +48,7 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
       {/* Title */}
       <div className="pb-4">
         <h2 className="text-lg font-bold text-slate-100">
-          Program Afiliasi & Referral Nusantara
+          Program Afiliasi & Referral
         </h2>
         <p className="text-xs text-slate-400 mt-0.5">
           Ajak sesama blogger, webmaster, dan pebisnis online Indonesia untuk mendapatkan komisi poin pasif seumur hidup.
@@ -57,7 +57,8 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
       </div>
 
       {/* Hero Referral Card */}
-      <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-950 p-6 sm:p-8">
+      <div className="relative bg-gradient-to-r from-emerald-950/40 via-slate-900 to-slate-950 p-6 sm:p-8">
+        <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
         <div className="max-w-2xl">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-none bg-emerald-500/10 border border-emerald-500/30 text-xs font-semibold text-emerald-300 mb-3">
             <Gift className="w-3.5 h-3.5 text-emerald-400" />
@@ -160,9 +161,10 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
         <h3 className="text-sm font-bold text-slate-100 mb-1">
           Daftar Member yang Anda Undang
         </h3>
-        <p className="text-xs text-slate-400 mb-4">
+        <p className="text-xs text-slate-400 mb-3">
           Pemantauan real-time aktivitas peselancar rujukan Anda.
         </p>
+        <VwsRowDivider className="mb-4" />
 
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -170,7 +172,7 @@ export const ReferralView: React.FC<ReferralViewProps> = ({ user }) => {
               <tr className="text-slate-400">
                 <th className="pb-3 font-semibold">Nama Pengguna</th>
                 <th className="pb-3 font-semibold">Wilayah Asal</th>
-                <th className="pb-3 font-semibold">Tanggal Daftar</th>
+                <th className="pb-3 font-semibold">Tanggal Register</th>
                 <th className="pb-3 font-semibold text-right">Poin Komisi</th>
                 <th className="pb-3 font-semibold text-right">Status Selancar</th>
               </tr>

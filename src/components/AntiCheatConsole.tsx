@@ -18,7 +18,7 @@ import {
 import { AntiCheatLogEntry, AntiCheatSeverity, AntiCheatStatus } from '../types';
 import { antiCheatEngine } from '../services/antiCheatEngine';
 import { APP_NAME } from '../config/appConfig';
-import { VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
+import { VwsGridFrame, VwsRowDivider, VwsBottomLine, VwsTopLine, VwsSmartLine, VwsColumnDivider } from './VwsSmartLine';
 
 interface AntiCheatConsoleProps {
   logs: AntiCheatLogEntry[];
@@ -85,16 +85,132 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
     downloadAnchor.remove();
   };
 
+  const securityLayers = [
+    {
+      id: 'layer-1',
+      icon: <Eye className="w-4 h-4" />,
+      iconColor: 'text-emerald-400',
+      title: '1. Pengawas Tab & Fokus (Visibility Guard)',
+      description:
+        'Mendeteksi jika peselancar meminimalkan browser atau membuka tab lain. Hitungan waktu dan distribusi poin otomatis dijeda agar tidak ada trafik hantu di latar belakang.',
+      metricLabel: 'Status Tab:',
+      metricValue: antiCheatStatus.tabFocused ? 'Aktif & Fokus' : 'Latar Belakang (Dijeda)',
+      metricClass: `font-medium ${antiCheatStatus.tabFocused ? 'text-emerald-400' : 'text-rose-400'}`,
+    },
+    {
+      id: 'layer-2',
+      icon: <Activity className="w-4 h-4" />,
+      iconColor: 'text-cyan-400',
+      title: '2. Pelacak Entropi Kursor Manusia',
+      description:
+        'Menganalisis variasi kurva vektor dan percepatan mouse. Gerakan garis lurus robotik atau keheningan mouse tanpa entropi (>30s) akan ditandai untuk diverifikasi.',
+      metricLabel: 'Skor Entropi:',
+      metricValue: `${antiCheatStatus.mouseEntropyScore}% (Organik)`,
+      metricClass: 'font-mono tabular-nums text-cyan-400 font-semibold',
+    },
+    {
+      id: 'layer-3',
+      icon: <Clock className="w-4 h-4" />,
+      iconColor: 'text-amber-400',
+      title: '3. Anti-Speedhack & Token Nonce',
+      description:
+        'Menghitung selisih waktu fisik nyata vs waktu browser. Ekstensi akselerasi waktu atau manipulasi tick JavaScript akan langsung digagalkan dan ditolak.',
+      metricLabel: 'Detak Heartbeat:',
+      metricValue: 'HMAC Berurutan Valid',
+      metricClass: 'text-amber-400 font-mono text-[11px]',
+    },
+    {
+      id: 'layer-4',
+      icon: <Lock className="w-4 h-4" />,
+      iconColor: 'text-emerald-400',
+      title: '4. Perisai Sandbox & Anti-Frame-Bust',
+      description: (
+        <>
+          Menahan situs nakal yang mencoba membajak jendela selancar menggunakan manipulasi{' '}
+          <code className="text-slate-300">top.location</code> atau popup spam yang mengganggu pengguna.
+        </>
+      ),
+      metricLabel: 'Isolasi Sandbox:',
+      metricValue: 'Terisolasi Ketat',
+      metricClass: 'text-emerald-400 font-medium',
+    },
+    {
+      id: 'layer-5',
+      icon: <Zap className="w-4 h-4" />,
+      iconColor: 'text-purple-400',
+      title: '5. Kunci Konkurensi Multi-Tab',
+      description: (
+        <>
+          Menggunakan <code className="text-slate-300">BroadcastChannel</code> untuk memastikan 1 akun browser hanya dapat menjalankan 1 sesi selancar aktif, melarang farming multi-tab ilegal.
+        </>
+      ),
+      metricLabel: 'Status Sesi:',
+      metricValue: '1 Sesi Eksklusif',
+      metricClass: 'text-purple-400 font-medium',
+    },
+    {
+      id: 'layer-6',
+      icon: <ShieldAlert className="w-4 h-4" />,
+      iconColor: 'text-rose-400',
+      title: '6. Pemindai Kepatuhan Hukum Kominfo',
+      description:
+        'Penyaringan otomatis terhadap kata kunci judi online/slot gacor, penipuan phising, dan konten ilegal sebelum website diizinkan masuk ke rotasi audiens Indonesia.',
+      metricLabel: 'Filter Kominfo:',
+      metricValue: '100% Bebas Judi Slot',
+      metricClass: 'text-emerald-400 font-medium',
+    },
+  ];
+
+  const sandboxTests = [
+    {
+      key: 'visibility',
+      title: '1. Uji Pindah Tab',
+      subtitle: 'Simulasi tab background',
+      hoverClass: 'group-hover:text-emerald-400',
+    },
+    {
+      key: 'zero_entropy',
+      title: '2. Uji Bot AFK',
+      subtitle: 'Simulasi kursor 0 entropi',
+      hoverClass: 'group-hover:text-cyan-400',
+    },
+    {
+      key: 'speed_hack',
+      title: '3. Uji Speed-Hack',
+      subtitle: 'Simulasi percepatan tick',
+      hoverClass: 'group-hover:text-amber-400',
+    },
+    {
+      key: 'frame_bust',
+      title: '4. Uji Frame-Bust',
+      subtitle: 'Simulasi hijack lokasi',
+      hoverClass: 'group-hover:text-purple-400',
+    },
+    {
+      key: 'multitab',
+      title: '5. Uji Multi-Tab',
+      subtitle: 'Simulasi sesi ganda',
+      hoverClass: 'group-hover:text-rose-400',
+    },
+    {
+      key: 'challenge',
+      title: '6. Tantangan PoP',
+      subtitle: 'Picu modal verifikasi',
+      hoverClass: 'group-hover:text-emerald-400',
+    },
+  ];
+
   return (
     <div className="space-y-6">
       {/* Title & Introduction */}
-      <div className="pb-4 border-b border-slate-800">
+      <div className="relative pb-4">
+        <VwsBottomLine bleedPx={16} />
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-emerald-400" />
               <h2 className="text-lg font-bold text-slate-100">
-                Pusat Integritas & Mesin Anti-Cheat Nusantara
+                Pusat Integritas & Mesin Anti-Cheat
               </h2>
             </div>
             <p className="text-xs text-slate-400 mt-1 max-w-2xl leading-relaxed">
@@ -111,114 +227,95 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
         </div>
       </div>
 
-      {/* 6 Security Layers Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {/* Layer 1 */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center gap-2 text-emerald-400 mb-1.5">
-            <Eye className="w-4 h-4" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              1. Pengawas Tab & Fokus (Visibility Guard)
-            </h3>
-          </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Mendeteksi jika peselancar meminimalkan browser atau membuka tab lain. Hitungan waktu dan distribusi poin otomatis dijeda agar tidak ada trafik hantu di latar belakang.
-          </p>
-          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">Status Tab:</span>
-            <span className={`font-medium ${antiCheatStatus.tabFocused ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {antiCheatStatus.tabFocused ? 'Aktif & Fokus' : 'Latar Belakang (Dijeda)'}
-            </span>
-          </div>
-        </div>
+      {/* 6 Security Layers Grid — Gapless Architectural vws-line* Grid */}
+      <div className="relative grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 bg-slate-900/70">
+        <VwsGridFrame hasBackground overhangPx={18} bleedPx={18} />
 
-        {/* Layer 2 */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center gap-2 text-cyan-400 mb-1.5">
-            <Activity className="w-4 h-4" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              2. Pelacak Entropi Kursor Manusia
-            </h3>
-          </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Menganalisis variasi kurva vektor dan percepatan mouse. Gerakan garis lurus robotik atau keheningan mouse tanpa entropi (&gt;30s) akan ditandai untuk diverifikasi.
-          </p>
-          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">Skor Entropi:</span>
-            <span className="font-mono tabular-nums text-cyan-400 font-semibold">
-              {antiCheatStatus.mouseEntropyScore}% (Organik)
-            </span>
-          </div>
-        </div>
+        {/* Tablet 2-column continuous center vertical divider */}
+        <VwsSmartLine
+          orientation="vertical"
+          offsetStart="26px"
+          offsetEnd="26px"
+          className="hidden md:block lg:hidden absolute left-1/2 z-10"
+          style={{ top: '-18px', height: 'calc(100% + 36px)' }}
+        />
 
-        {/* Layer 3 */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center gap-2 text-amber-400 mb-1.5">
-            <Clock className="w-4 h-4" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              3. Anti-Speedhack & Token Nonce
-            </h3>
-          </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Menghitung selisih waktu fisik nyata vs waktu browser. Ekstensi akselerasi waktu atau manipulasi tick JavaScript akan langsung digagalkan dan ditolak.
-          </p>
-          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">Detak Heartbeat:</span>
-            <span className="text-amber-400 font-mono text-[11px]">HMAC Berurutan Valid</span>
-          </div>
-        </div>
+        {/* Desktop 3-column continuous vertical dividers */}
+        <VwsSmartLine
+          orientation="vertical"
+          offsetStart="26px"
+          offsetEnd="26px"
+          className="hidden lg:block absolute left-1/3 z-10"
+          style={{ top: '-18px', height: 'calc(100% + 36px)' }}
+        />
+        <VwsSmartLine
+          orientation="vertical"
+          offsetStart="26px"
+          offsetEnd="26px"
+          className="hidden lg:block absolute left-2/3 z-10"
+          style={{ top: '-18px', height: 'calc(100% + 36px)' }}
+        />
 
-        {/* Layer 4 */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center gap-2 text-emerald-400 mb-1.5">
-            <Lock className="w-4 h-4" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              4. Perisai Sandbox & Anti-Frame-Bust
-            </h3>
-          </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Menahan situs nakal yang mencoba membajak jendela selancar menggunakan manipulasi <code className="text-slate-300">top.location</code> atau popup spam yang mengganggu pengguna.
-          </p>
-          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">Isolasi Sandbox:</span>
-            <span className="text-emerald-400 font-medium">Terisolasi Ketat</span>
-          </div>
-        </div>
+        {securityLayers.map((layer, idx) => {
+          const isMdLeft = idx % 2 === 0;
+          const lgCol = idx % 3;
 
-        {/* Layer 5 */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center gap-2 text-purple-400 mb-1.5">
-            <Zap className="w-4 h-4" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              5. Kunci Konkurensi Multi-Tab
-            </h3>
-          </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Menggunakan <code className="text-slate-300">BroadcastChannel</code> untuk memastikan 1 akun browser hanya dapat menjalankan 1 sesi selancar aktif, melarang farming multi-tab ilegal.
-          </p>
-          <div className="mt-3 pt-2 border-t border-slate-800/80 flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">Status Sesi:</span>
-            <span className="text-purple-400 font-medium">1 Sesi Eksklusif</span>
-          </div>
-        </div>
+          return (
+            <div
+              key={layer.id}
+              className="vws-grid-cell p-5 flex flex-col justify-between hover:bg-slate-900/90 transition-colors"
+            >
+              {/* Mobile single-column row divider */}
+              {idx > 0 && <VwsTopLine bleedPx={18} className="md:hidden" />}
 
-        {/* Layer 6 */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
-          <div className="flex items-center gap-2 text-rose-400 mb-1.5">
-            <ShieldAlert className="w-4 h-4" />
-            <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-              6. Pemindai Kepatuhan Hukum Kominfo
-            </h3>
-          </div>
-          <p className="text-xs text-slate-400 leading-relaxed">
-            Penyaringan otomatis terhadap kata kunci judi online/slot gacor, penipuan phising, dan konten ilegal sebelum website diizinkan masuk ke rotasi audiens Indonesia.
-          </p>
-          <VwsRowDivider className="mt-3 mb-2" />
-          <div className="flex items-center justify-between text-[11px]">
-            <span className="text-slate-500">Filter Kominfo:</span>
-            <span className="text-emerald-400 font-medium">100% Bebas Judi Slot</span>
-          </div>
-        </div>
+              {/* Tablet 2-column continuous row divider */}
+              {idx >= 2 && (
+                <VwsSmartLine
+                  orientation="horizontal"
+                  offsetStart={isMdLeft ? '26px' : '0px'}
+                  offsetEnd={isMdLeft ? '0px' : '26px'}
+                  className="hidden md:block lg:hidden absolute top-0 z-10"
+                  style={{
+                    left: isMdLeft ? '-18px' : '0px',
+                    right: isMdLeft ? '0px' : '-18px',
+                  }}
+                />
+              )}
+
+              {/* Desktop 3-column continuous row divider */}
+              {idx >= 3 && (
+                <VwsSmartLine
+                  orientation="horizontal"
+                  offsetStart={lgCol === 0 ? '26px' : '0px'}
+                  offsetEnd={lgCol === 2 ? '26px' : '0px'}
+                  className="hidden lg:block absolute top-0 z-10"
+                  style={{
+                    left: lgCol === 0 ? '-18px' : '0px',
+                    right: lgCol === 2 ? '-18px' : '0px',
+                  }}
+                />
+              )}
+
+              <div>
+                <div className={`flex items-center gap-2 ${layer.iconColor} mb-1.5`}>
+                  {layer.icon}
+                  <h3 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    {layer.title}
+                  </h3>
+                </div>
+                <p className="text-xs text-slate-400 leading-relaxed">{layer.description}</p>
+              </div>
+
+              <div className="mt-4">
+                <VwsRowDivider className="mb-2.5" />
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="text-slate-500">{layer.metricLabel}</span>
+                  <span className={layer.metricClass}>{layer.metricValue}</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Interactive Anti-Cheat Testing Sandbox */}
@@ -238,84 +335,56 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
         <VwsRowDivider className="mb-4" />
 
         {testNotification && (
-          <div className="mb-4 p-3 rounded-lg bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
+          <div className="mb-4 p-3 bg-emerald-950/60 border border-emerald-500/40 text-emerald-300 text-xs flex items-center gap-2 animate-fade-in">
             <CheckCircle2 className="w-4 h-4 shrink-0" />
             <span>{testNotification}</span>
           </div>
         )}
 
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-          <button
-            onClick={() => runTestVector('visibility')}
-            className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-left transition-colors cursor-pointer group"
-          >
-            <span className="text-xs font-semibold text-slate-200 block group-hover:text-emerald-400">
-              1. Uji Pindah Tab
-            </span>
-            <span className="text-[11px] text-slate-500 block mt-1">
-              Simulasi tab background
-            </span>
-          </button>
+        <div className="relative grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 bg-slate-950/60">
+          <VwsGridFrame hasBackground overhangPx={12} bleedPx={12} />
 
-          <button
-            onClick={() => runTestVector('zero_entropy')}
-            className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-left transition-colors cursor-pointer group"
-          >
-            <span className="text-xs font-semibold text-slate-200 block group-hover:text-cyan-400">
-              2. Uji Bot AFK
-            </span>
-            <span className="text-[11px] text-slate-500 block mt-1">
-              Simulasi kursor 0 entropi
-            </span>
-          </button>
+          {/* Mobile 2-column continuous vertical divider */}
+          <VwsSmartLine
+            orientation="vertical"
+            offsetStart="20px"
+            offsetEnd="20px"
+            className="sm:hidden absolute left-1/2 z-10"
+            style={{ top: '-12px', height: 'calc(100% + 24px)' }}
+          />
 
-          <button
-            onClick={() => runTestVector('speed_hack')}
-            className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-left transition-colors cursor-pointer group"
-          >
-            <span className="text-xs font-semibold text-slate-200 block group-hover:text-amber-400">
-              3. Uji Speed-Hack
-            </span>
-            <span className="text-[11px] text-slate-500 block mt-1">
-              Simulasi percepatan tick
-            </span>
-          </button>
+          {/* Tablet 3-column continuous vertical dividers */}
+          <VwsSmartLine
+            orientation="vertical"
+            offsetStart="20px"
+            offsetEnd="20px"
+            className="hidden sm:block lg:hidden absolute left-1/3 z-10"
+            style={{ top: '-12px', height: 'calc(100% + 24px)' }}
+          />
+          <VwsSmartLine
+            orientation="vertical"
+            offsetStart="20px"
+            offsetEnd="20px"
+            className="hidden sm:block lg:hidden absolute left-2/3 z-10"
+            style={{ top: '-12px', height: 'calc(100% + 24px)' }}
+          />
 
-          <button
-            onClick={() => runTestVector('frame_bust')}
-            className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-left transition-colors cursor-pointer group"
-          >
-            <span className="text-xs font-semibold text-slate-200 block group-hover:text-purple-400">
-              4. Uji Frame-Bust
-            </span>
-            <span className="text-[11px] text-slate-500 block mt-1">
-              Simulasi hijack lokasi
-            </span>
-          </button>
-
-          <button
-            onClick={() => runTestVector('multitab')}
-            className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-left transition-colors cursor-pointer group"
-          >
-            <span className="text-xs font-semibold text-slate-200 block group-hover:text-rose-400">
-              5. Uji Multi-Tab
-            </span>
-            <span className="text-[11px] text-slate-500 block mt-1">
-              Simulasi sesi ganda
-            </span>
-          </button>
-
-          <button
-            onClick={() => runTestVector('challenge')}
-            className="p-3 rounded-lg border border-slate-800 bg-slate-950/60 hover:bg-slate-800 text-left transition-colors cursor-pointer group"
-          >
-            <span className="text-xs font-semibold text-slate-200 block group-hover:text-emerald-400">
-              6. Tantangan PoP
-            </span>
-            <span className="text-[11px] text-slate-500 block mt-1">
-              Picu modal verifikasi
-            </span>
-          </button>
+          {sandboxTests.map((test, idx) => (
+            <button
+              key={test.key}
+              type="button"
+              onClick={() => runTestVector(test.key)}
+              className="vws-grid-cell p-3.5 hover:bg-slate-800/80 text-left transition-colors cursor-pointer group"
+            >
+              {idx > 0 && <VwsColumnDivider visibleFrom="lg" overhangPx={12} />}
+              {idx >= 2 && <VwsTopLine bleed={false} className="sm:hidden" />}
+              {idx >= 3 && <VwsTopLine bleed={false} className="hidden sm:block lg:hidden" />}
+              <span className={`text-xs font-semibold text-slate-200 block ${test.hoverClass}`}>
+                {test.title}
+              </span>
+              <span className="text-[11px] text-slate-500 block mt-1">{test.subtitle}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -388,16 +457,16 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
             </button>
           </div>
         </div>
-        <VwsRowDivider className="mb-4" />
+        <VwsRowDivider className="mb-3" />
 
         {/* Audit Log Entries List */}
-        <div className="space-y-2 max-h-[380px] overflow-y-auto pr-1">
+        <div className="max-h-[380px] overflow-y-auto px-4">
           {filteredLogs.length === 0 ? (
             <div className="p-8 text-center text-xs text-slate-500">
               Tidak ada log untuk filter yang dipilih.
             </div>
           ) : (
-            filteredLogs.map((entry) => {
+            filteredLogs.map((entry, idx) => {
               let badgeColor = 'text-emerald-400 border-emerald-800/40 bg-emerald-950/30';
               if (entry.severity === 'warning') {
                 badgeColor = 'text-amber-400 border-amber-800/40 bg-amber-950/30';
@@ -412,34 +481,34 @@ export const AntiCheatConsole: React.FC<AntiCheatConsoleProps> = ({
               });
 
               return (
-                <div
-                  key={entry.id}
-                  className="p-3 rounded-lg bg-slate-950/70 border border-slate-800/70 flex flex-col sm:flex-row sm:items-start justify-between gap-2 text-xs"
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono text-slate-500 tabular-nums text-[11px]">
-                        {timeStr}
-                      </span>
-                      <span className="text-slate-600">·</span>
-                      <span className="font-semibold text-slate-200">{entry.title}</span>
+                <React.Fragment key={entry.id}>
+                  {idx > 0 && <VwsRowDivider />}
+                  <div className="py-3 flex flex-col sm:flex-row sm:items-start justify-between gap-2 text-xs hover:bg-slate-950/40 transition-colors">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-slate-500 tabular-nums text-[11px]">
+                          {timeStr}
+                        </span>
+                        <span className="text-slate-600">·</span>
+                        <span className="font-semibold text-slate-200">{entry.title}</span>
+                      </div>
+                      <p className="text-slate-400 text-xs leading-relaxed max-w-2xl">
+                        {entry.details}
+                      </p>
                     </div>
-                    <p className="text-slate-400 text-xs leading-relaxed max-w-2xl">
-                      {entry.details}
-                    </p>
-                  </div>
 
-                  <div className="shrink-0 flex items-center gap-2 self-start sm:self-auto">
-                    {entry.metricValue && (
-                      <span className="font-mono text-[11px] text-slate-400 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
-                        {entry.metricValue}
+                    <div className="shrink-0 flex items-center gap-2 self-start sm:self-auto">
+                      {entry.metricValue && (
+                        <span className="font-mono text-[11px] text-slate-400 px-2 py-0.5 rounded bg-slate-900 border border-slate-800">
+                          {entry.metricValue}
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase border ${badgeColor}`}>
+                        {entry.severity}
                       </span>
-                    )}
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-mono uppercase border ${badgeColor}`}>
-                      {entry.severity}
-                    </span>
+                    </div>
                   </div>
-                </div>
+                </React.Fragment>
               );
             })
           )}

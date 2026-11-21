@@ -158,7 +158,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            Login / Daftar Akun WordPress
+            Login / Register Akun WordPress
           </button>
           <button
             onClick={() => setActiveTab('config')}
@@ -233,7 +233,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                   }`}
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Masuk Akun</span>
+                  <span>Login</span>
                 </button>
                 <button
                   type="button"
@@ -248,7 +248,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                   }`}
                 >
                   <UserPlus className="w-3.5 h-3.5" />
-                  <span>Daftar Member Baru</span>
+                  <span>Register</span>
                 </button>
               </div>
             )}
@@ -343,7 +343,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
                   <>
                     <span>
                       {authAction === 'register'
-                        ? 'Daftar & Simpan ke MySQL WordPress'
+                        ? 'Register & Simpan ke MySQL WordPress'
                         : 'Login & Sinkronkan Data MySQL'}
                     </span>
                     <ArrowRight className="w-4 h-4" />
@@ -380,7 +380,7 @@ export const WordPressAuthModal: React.FC<WordPressAuthModalProps> = ({
               </div>
               <ol className="list-decimal list-inside space-y-1 text-[11px] text-slate-300 pt-2 border-t border-emerald-900/40">
                 <li>Unduh file <code className="text-emerald-300">trafik-wp-bridge.zip</code> di atas.</li>
-                <li>Masuk ke <strong>WP Admin ({config.wpUrl}/wp-admin) → Plugins → Add New → Upload Plugin</strong>, lalu <strong>Activate</strong>.</li>
+                <li>Login ke <strong>WP Admin ({config.wpUrl}/wp-admin) → Plugins → Add New → Upload Plugin</strong>, lalu <strong>Activate</strong>.</li>
                 <li>Klik <strong>Uji Koneksi Bridge</strong> di bawah, ubah mode ke <strong>Live WordPress Plugin Bridge</strong>, lalu login di tab sebelah.</li>
               </ol>
             </div>
