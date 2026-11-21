@@ -22,7 +22,7 @@ import { wpAuthService } from '../services/wordpressAuthService';
 import { BrandLogoConfig } from '../utils/logoBranding';
 import { BrandMark } from './BrandMark';
 import { VwsTopLine, VwsBottomLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
-import heroNetworkImg from '../assets/images/vel_hero_network_1795023164834.webp';
+import { HeroIndonesiaAnimatedMap } from './HeroIndonesiaAnimatedMap';
 import regionalTargetingImg from '../assets/images/vel_regional_targeting_1795023164349.webp';
 import anticheatGuardImg from '../assets/images/vel_anticheat_guard_1795023165931.webp';
 import contentAuditImg from '../assets/images/vel_content_audit_1795023165678.webp';
@@ -363,32 +363,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </div>
             </div>
 
-            {/* Hero 16:9 Clean Monochrome SaaS Vector Illustration */}
+            {/* Hero Animated 38-Province Indonesia SVG with Live Trafik Telemetry */}
             <div className="lg:col-span-6">
-              <div className="relative h-full min-h-[280px] sm:min-h-[360px] rounded-2xl overflow-hidden border border-slate-800 bg-[#0f172a]">
-                {!failedImages['hero'] ? (
-                  <img
-                    src={heroNetworkImg}
-                    alt="Ilustrasi jendela browser menampilkan peta jaringan pengunjung Indonesia dan perangkat terhubung"
-                    referrerPolicy="no-referrer"
-                    decoding="async"
-                    fetchPriority="high"
-                    onError={() => markImageFailed('hero')}
-                    className="w-full h-full object-cover lg:h-full"
-                  />
-                ) : (
-                  <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-gradient-to-br from-slate-900 via-slate-900 to-emerald-950/40 text-center">
-                    <Globe className="w-12 h-12 text-emerald-400 mb-3" />
-                    <div className="text-sm font-semibold text-slate-200">{APP_NAME} Nusantara</div>
-                    <div className="text-xs text-slate-400 mt-1">Distribusi Pengunjung Lokal Terverifikasi</div>
-                  </div>
-                )}
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-transparent to-transparent pointer-events-none" />
-                <div className="absolute bottom-4 left-4 right-4 flex items-center justify-between gap-4 text-xs text-slate-200">
-                  <span className="font-medium">Distribusi Real-Time 38 Provinsi</span>
-                  <span className="font-mono tabular-nums text-emerald-300">Sandbox Aman · Anti-Bot</span>
-                </div>
-              </div>
+              <HeroIndonesiaAnimatedMap />
             </div>
           </div>
 

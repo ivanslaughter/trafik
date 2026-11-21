@@ -68,3 +68,115 @@
 .animate-slide-in-right {
   animation: slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ============================================================================
+   Hero 38-Province Animated Indonesia SVG (Trafik Live Network Visualization)
+   ============================================================================ */
+.trafik-hero-svg-stage svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@keyframes trafikProvinceBreath {
+  0%,
+  100% {
+    fill-opacity: var(--prov-min-op, 0.16);
+  }
+  50% {
+    fill-opacity: var(--prov-max-op, 0.48);
+  }
+}
+
+@keyframes trafikCityGlow {
+  0%,
+  100% {
+    transform: scale(0.92);
+    opacity: 0.88;
+  }
+  50% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+}
+
+@keyframes trafikCityRipple {
+  0% {
+    transform: scale(0.9);
+    opacity: 0.82;
+  }
+  75% {
+    transform: scale(var(--ring-scale, 3.2));
+    opacity: 0;
+  }
+  100% {
+    transform: scale(var(--ring-scale, 3.2));
+    opacity: 0;
+  }
+}
+
+.trafik-hero-province {
+  fill: var(--prov-fill, #10b981);
+  stroke: var(--prov-stroke, rgba(226, 232, 240, 0.55));
+  stroke-width: 1.15;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  pointer-events: all;
+  transition: fill 600ms ease, stroke 200ms ease, stroke-width 200ms ease;
+  animation: trafikProvinceBreath var(--prov-dur, 4.6s) ease-in-out var(--prov-delay, 0s) infinite;
+}
+
+.trafik-hero-province:hover,
+.trafik-hero-province[data-hovered="true"] {
+  animation-play-state: paused;
+  fill-opacity: 0.92 !important;
+  stroke: #a7f3d0;
+  stroke-width: 1.8;
+}
+
+.trafik-hero-city-dot {
+  fill: var(--city-color, #10b981);
+  stroke: #0b1220;
+  stroke-width: 2.6;
+  cursor: pointer;
+  pointer-events: all;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: fill 1.3s ease;
+  animation: trafikCityGlow var(--city-dur, 3.2s) ease-in-out var(--city-delay, 0s) infinite;
+}
+
+.trafik-hero-city-dot:hover,
+.trafik-hero-city-dot[data-hovered="true"] {
+  stroke: #ffffff;
+  stroke-width: 3.4;
+}
+
+.trafik-hero-city-ring {
+  fill: none;
+  stroke: var(--city-color, #10b981);
+  stroke-width: 3.2;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: stroke 1.3s ease;
+  animation: trafikCityRipple var(--ring-dur, 3.6s) cubic-bezier(0.16, 1, 0.3, 1) var(--city-delay, 0s) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trafik-hero-province,
+  .trafik-hero-city-dot,
+  .trafik-hero-city-ring {
+    animation: none !important;
+  }
+
+  .trafik-hero-province {
+    fill-opacity: var(--prov-max-op, 0.42);
+  }
+
+  .trafik-hero-city-ring {
+    opacity: 0.35;
+    transform: scale(1.8);
+  }
+}
+
