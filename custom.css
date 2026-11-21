@@ -1,0 +1,31 @@
+/* =========================================================================
+   TRAFIK - Custom CSS Overrides
+   =========================================================================
+   File ini dimuat setelah CSS utama aplikasi.
+   Anda dapat mengedit file ini langsung di File Manager Hostinger
+   (public_html/trafik/custom.css) untuk mengubah font, warna, atau gaya
+   tanpa perlu melakukan compile ulang seluruh aplikasi React.
+   ========================================================================= */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+:root {
+  --custom-font-family: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+body, button, input, select, textarea {
+  font-family: var(--custom-font-family) !important;
+}
+h1, h2, h3, h4, h5, h6{
+  font-family: var(--custom-font-family) !important;
+}
+
+/* Ensure map outlines and connection lines never scale or blow up on zoom */
+#d3_indonesia_svg path,
+#d3_indonesia_svg polygon,
+#d3_indonesia_svg polyline,
+#d3_indonesia_svg line,
+.backbone-line {
+  vector-effect: non-scaling-stroke !important;
+}
+
