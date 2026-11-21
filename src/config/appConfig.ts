@@ -24,6 +24,8 @@ export interface AppConfig {
   supportEmail: string;
   /** Domain or website URL */
   url: string;
+  /** Feature flag to enable/disable paid packages & VIP upgrade flows (Phase 2 Xendit) */
+  paymentsEnabled: boolean;
 }
 
 export const APP_CONFIG: AppConfig = {
@@ -37,6 +39,7 @@ export const APP_CONFIG: AppConfig = {
   legalEntity: 'Trafik Nusantara Digital',
   supportEmail: 'bantuan@trafik.id',
   url: 'https://trafiknusantara.id',
+  paymentsEnabled: import.meta.env.VITE_PAYMENTS_ENABLED === 'true',
 };
 
 /**
@@ -46,6 +49,12 @@ export const APP_CONFIG: AppConfig = {
  *   <h1>Welcome to {APP_NAME}</h1>
  */
 export const APP_NAME = APP_CONFIG.name;
+
+/**
+ * Central switch for paid point packages & VIP upgrade UI.
+ * Keep false during Free Launch Mode; flip to true when Xendit QRIS & BCA VA is live.
+ */
+export const PAYMENTS_ENABLED = APP_CONFIG.paymentsEnabled;
 
 /**
  * Helper to generate page document titles consistently

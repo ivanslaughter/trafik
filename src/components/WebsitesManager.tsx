@@ -26,7 +26,7 @@ import { WebsiteCampaign, IndonesianRegionId, DeviceType, WebsiteCategory, UserP
 import { INDONESIAN_REGIONS } from '../data/mockData';
 import { auditWebsiteCompliance } from '../services/complianceAuditEngine';
 import { wpAuthService } from '../services/wordpressAuthService';
-import { APP_CONFIG, APP_NAME } from '../config/appConfig';
+import { APP_CONFIG, APP_NAME, PAYMENTS_ENABLED } from '../config/appConfig';
 import { VwsRowDivider, VwsBottomLine, VwsTopLine, VwsGridFrame, VwsSmartLine, VwsColumnDivider } from './VwsSmartLine';
 import {
   ClientUrlValidationResult,
@@ -223,7 +223,11 @@ export const WebsitesManager: React.FC<WebsitesManagerProps> = ({
     }
 
     if (!editingSite && allocatedPoints > user.points) {
-      setErrorMsg(`Saldo poin Anda tidak cukup (${user.points} Poin tersedia). Beli poin atau kurangi alokasi awal.`);
+      setErrorMsg(
+        PAYMENTS_ENABLED
+          ? `Saldo poin Anda tidak cukup (${user.points} Poin tersedia). Beli poin atau kurangi alokasi awal.`
+          : `Saldo poin Anda tidak cukup (${user.points} Poin tersedia). Jalankan Selancar Trafik gratis untuk menambah poin atau kurangi alokasi awal.`
+      );
       return;
     }
 

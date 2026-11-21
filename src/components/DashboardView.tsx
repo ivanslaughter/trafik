@@ -18,7 +18,7 @@ import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, IndonesianRegionId } f
 import { IndonesiaNetworkMap } from './IndonesiaNetworkMap';
 import { UserWeeklyTrendChart } from './UserWeeklyTrendChart';
 import { VwsTopLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider, VwsTableRowDivider } from './VwsSmartLine';
-import { APP_NAME, APP_CONFIG } from '../config/appConfig';
+import { APP_NAME, APP_CONFIG, PAYMENTS_ENABLED } from '../config/appConfig';
 import { wpAuthService, NetworkMapStatsResponse, WeeklyTrendResponse } from '../services/wordpressAuthService';
 
 const DASHBOARD_POLL_INTERVAL_MS = 30_000;
@@ -225,13 +225,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-4">
             <VwsRowDivider className="mb-3" />
             <div className="flex items-center justify-between text-xs">
-              <button
-                onClick={onOpenPricing}
-                className="text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
-              >
-                + Top Up Poin
-              </button>
-              <span className="text-slate-500">IDR/QRIS</span>
+              {PAYMENTS_ENABLED ? (
+                <>
+                  <button
+                    onClick={onOpenPricing}
+                    className="text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
+                  >
+                    + Top Up Poin
+                  </button>
+                  <span className="text-slate-500">IDR/QRIS</span>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={onStartSurfing}
+                    className="text-emerald-400 hover:text-emerald-300 font-medium cursor-pointer"
+                  >
+                    + Tambah via Selancar
+                  </button>
+                  <span className="text-slate-500">100% Gratis</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -324,16 +338,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <VwsRowDivider className="mb-3" />
             <div className="flex items-center justify-between text-xs">
               {user.membership === 'gratis' ? (
-                <button
-                  onClick={onOpenPricing}
-                  className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
-                >
-                  Upgrade Rasio 100% →
-                </button>
+                PAYMENTS_ENABLED ? (
+                  <button
+                    onClick={onOpenPricing}
+                    className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
+                  >
+                    Upgrade Rasio 100% →
+                  </button>
+                ) : (
+                  <span className="text-emerald-400 font-semibold">Akses Gratis Aktif</span>
+                )
               ) : (
                 <span className="text-amber-400 font-semibold">VIP Aktif</span>
               )}
-              <span className="text-slate-500">Tier Akun</span>
+              <span className="text-slate-500">
+                {PAYMENTS_ENABLED ? 'Tier Akun' : '100% Gratis'}
+              </span>
             </div>
           </div>
         </div>

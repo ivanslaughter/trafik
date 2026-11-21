@@ -10,7 +10,7 @@ import {
   CheckCircle2,
   AlertTriangle,
 } from 'lucide-react';
-import { APP_NAME } from '../config/appConfig';
+import { APP_NAME, PAYMENTS_ENABLED } from '../config/appConfig';
 import { UserProfile } from '../types';
 import { VwsGridFrame, VwsRowDivider, VwsSmartLine, VwsTopLine } from './VwsSmartLine';
 import { FAQAccordion } from './FAQAccordion';
@@ -42,7 +42,7 @@ const GUIDE_CATEGORIES: { id: GuideCategoryId; label: string }[] = [
   { id: 'all', label: 'Semua Topik' },
   { id: 'campaigns', label: 'Mulai & Website' },
   { id: 'surfing', label: 'Selancar & Anti-Cheat' },
-  { id: 'points', label: 'Poin, VIP & Referral' },
+  { id: 'points', label: PAYMENTS_ENABLED ? 'Poin, VIP & Referral' : 'Poin & Referral' },
   { id: 'compliance', label: 'Kepatuhan Konten' },
 ];
 
@@ -59,7 +59,9 @@ const GUIDE_ARTICLES: GuideArticle[] = [
       'Tentukan durasi kunjungan (15–60 detik), target wilayah (Nasional atau provinsi/kota tertentu), serta batas hit harian agar grafik kunjungan terlihat alami.',
       'Alokasikan sejumlah poin dari saldo Anda. Kampanye berstatus Aktif akan langsung masuk antrean rotasi setelah lolos pemindaian kepatuhan.',
     ],
-    note: 'Member Gratis dapat menjalankan hingga 3 slot website aktif secara bersamaan, sedangkan Pro Nusantara hingga 20 slot.',
+    note: PAYMENTS_ENABLED
+      ? 'Member Gratis dapat menjalankan hingga 3 slot website aktif secara bersamaan, sedangkan Pro Nusantara hingga 20 slot.'
+      : 'Setiap member dapat menjalankan hingga 3 slot kampanye website aktif secara gratis dan menargetkan audiens lokal Indonesia.',
     actionLabel: 'Buka Website Saya',
     actionType: 'websites',
   },
@@ -82,18 +84,29 @@ const GUIDE_ARTICLES: GuideArticle[] = [
   {
     id: 'guide-points-ratio',
     category: 'points',
-    title: 'Perhitungan Poin, Rasio 70% vs 100%, & Bonus Harian',
+    title: PAYMENTS_ENABLED
+      ? 'Perhitungan Poin, Rasio 70% vs 100%, & Bonus Harian'
+      : 'Perhitungan Poin Selancar, Bonus Harian & Referral',
     summary:
       'Memahami konversi waktu selancar menjadi poin kunjungan dan cara memaksimalkan saldo tanpa biaya tambahan.',
-    steps: [
-      'Member Gratis mendapatkan rasio pertukaran 70% (misal kunjungan 30 detik bernilai 0.70 poin ke saldo Anda).',
-      'Member Pro Nusantara mendapatkan rasio penuh 100% (kunjungan 30 detik langsung memberi 1.00 poin penuh).',
-      'Selesaikan target selancar harian 30 menit per hari untuk membuka bonus streak tambahan +50 poin.',
-      'Bagikan tautan afiliasi Anda di menu Referral untuk memperoleh komisi 15% dari setiap aktivitas teman yang mendaftar.',
-    ],
-    note: 'Anda juga dapat membeli paket poin instan kapan saja melalui QRIS atau Virtual Account di menu Tarif & Beli Poin.',
-    actionLabel: 'Lihat Paket Poin & VIP',
-    actionType: 'pricing',
+    steps: PAYMENTS_ENABLED
+      ? [
+          'Member Gratis mendapatkan rasio pertukaran 70% (misal kunjungan 30 detik bernilai 1.00 poin menghasilkan 0.70 poin ke saldo Anda).',
+          'Member Pro Nusantara mendapatkan rasio penuh 100% (kunjungan 30 detik langsung memberi 1.00 poin penuh).',
+          'Selesaikan target selancar harian 30 menit per hari untuk membuka bonus streak tambahan +50 poin.',
+          'Bagikan tautan afiliasi Anda di menu Referral untuk memperoleh komisi 15% dari setiap aktivitas teman yang mendaftar.',
+        ]
+      : [
+          'Setiap member baru langsung menerima bonus pendaftaran 1.500 poin awal secara gratis.',
+          'Setiap sesi selancar aktif memberikan rasio pertukaran 70% (kunjungan 30 detik bernilai 1.00 poin menghasilkan +0.70 poin ke saldo Anda).',
+          'Selesaikan target selancar harian 30 menit per hari untuk membuka bonus streak tambahan +50 poin secara otomatis.',
+          'Bagikan tautan afiliasi Anda di menu Referral untuk memperoleh komisi 15% dari setiap aktivitas teman yang mendaftar.',
+        ],
+    note: PAYMENTS_ENABLED
+      ? 'Anda juga dapat membeli paket poin instan kapan saja melalui QRIS atau Virtual Account di menu Tarif & Beli Poin.'
+      : 'Seluruh fitur pertukaran trafik saat ini 100% gratis tanpa biaya langganan — kumpulkan poin tanpa batas lewat selancar harian dan referral.',
+    actionLabel: PAYMENTS_ENABLED ? 'Lihat Paket Poin & VIP' : 'Mulai Selancar Gratis',
+    actionType: PAYMENTS_ENABLED ? 'pricing' : 'surfing',
   },
   {
     id: 'guide-compliance-audit',

@@ -4,6 +4,7 @@ import { UserProfile } from '../types';
 import { BrandLogoConfig } from '../utils/logoBranding';
 import { BrandMark } from './BrandMark';
 import { VwsTopLine, VwsBottomLine } from './VwsSmartLine';
+import { PAYMENTS_ENABLED } from '../config/appConfig';
 
 interface NavbarProps {
   currentTab: string;
@@ -80,7 +81,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             onClick={onOpenPricing}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-800 bg-slate-900/80 hover:border-slate-700 transition-colors text-xs font-medium text-slate-200 cursor-pointer"
-            title="Klik untuk tambah poin atau upgrade VIP"
+            title={
+              PAYMENTS_ENABLED
+                ? 'Klik untuk tambah poin atau upgrade VIP'
+                : 'Saldo Poin Trafik — Klik untuk mulai selancar gratis'
+            }
           >
             <Sparkles className="w-3.5 h-3.5 text-amber-400" />
             <span className="font-mono tabular-nums text-emerald-400 font-semibold">

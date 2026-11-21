@@ -16,7 +16,7 @@ import { UserProfile, WebsiteCampaign, AntiCheatLogEntry, GeoStatus } from './ty
 import { antiCheatEngine } from './services/antiCheatEngine';
 import { wpAuthService } from './services/wordpressAuthService';
 import { HelpCircle, Ban, MapPin, ArrowLeft, LogIn } from 'lucide-react';
-import { APP_NAME, APP_CONFIG, getPageTitle } from './config/appConfig';
+import { APP_NAME, APP_CONFIG, PAYMENTS_ENABLED, getPageTitle } from './config/appConfig';
 import { AntiCheatToastContainer, AntiCheatToastItem } from './components/AntiCheatToast';
 import { BrandMark } from './components/BrandMark';
 import { VwsTopLine, VwsRowDivider } from './components/VwsSmartLine';
@@ -933,7 +933,13 @@ export default function App() {
           }
           handleOpenSurfing();
         }}
-        onOpenPricing={() => setPricingModalOpen(true)}
+        onOpenPricing={() => {
+          if (PAYMENTS_ENABLED) {
+            setPricingModalOpen(true);
+          } else {
+            handleOpenSurfing();
+          }
+        }}
         onOpenProfile={() => setProfileModalOpen(true)}
       />
 
@@ -1174,7 +1180,7 @@ export default function App() {
           />
         )}
 
-        {pricingModalOpen && (
+        {PAYMENTS_ENABLED && pricingModalOpen && (
           <PricingModal
             isOpen={pricingModalOpen}
             onClose={() => setPricingModalOpen(false)}
@@ -1238,12 +1244,14 @@ export default function App() {
               >
                 Program Afiliasi
               </button>
-              <button
-                onClick={() => setPricingModalOpen(true)}
-                className="hover:text-slate-200 transition-colors cursor-pointer"
-              >
-                Tarif & Beli Poin
-              </button>
+              {PAYMENTS_ENABLED && (
+                <button
+                  onClick={() => setPricingModalOpen(true)}
+                  className="hover:text-slate-200 transition-colors cursor-pointer"
+                >
+                  Tarif & Beli Poin
+                </button>
+              )}
               <button
                 onClick={() => setCurrentTab('help')}
                 className="hover:text-slate-200 transition-colors cursor-pointer inline-flex items-center gap-1 text-emerald-400/90 font-medium"

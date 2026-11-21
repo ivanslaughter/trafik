@@ -16,7 +16,7 @@ import {
   BookOpen,
   MapPin,
 } from 'lucide-react';
-import { APP_NAME, APP_CONFIG } from '../config/appConfig';
+import { APP_NAME, APP_CONFIG, PAYMENTS_ENABLED } from '../config/appConfig';
 import { UserProfile, GeoStatus } from '../types';
 import { wpAuthService } from '../services/wordpressAuthService';
 import { BrandLogoConfig } from '../utils/logoBranding';
@@ -79,8 +79,9 @@ const LANDING_FAQS = [
   {
     id: 'faq-points',
     question: 'Bagaimana cara menghitung dan mendapatkan poin kunjungan?',
-    answer:
-      'Setiap member baru memperoleh bonus 1.500 poin awal. Saat Anda berselancar mengunjungi situs member lain, Anda menerima poin sesuai durasi tayang (rasio 70% untuk Member Gratis dan 100% penuh untuk Pro Nusantara). Anda juga bisa menambah poin melalui program referral 15% atau paket poin instan.',
+    answer: PAYMENTS_ENABLED
+      ? 'Setiap member baru memperoleh bonus 1.500 poin awal. Saat Anda berselancar mengunjungi situs member lain, Anda menerima poin sesuai durasi tayang (rasio 70% untuk Member Gratis dan 100% penuh untuk Pro Nusantara). Anda juga bisa menambah poin melalui program referral 15% atau paket poin instan.'
+      : 'Setiap member baru langsung memperoleh bonus 1.500 poin awal secara gratis. Saat Anda berselancar mengunjungi situs member lain, Anda menerima poin sesuai durasi tayang (+0.70 poin per kunjungan 30 detik), ditambah bonus harian +50 poin dan komisi referral 15% tanpa biaya apa pun.',
   },
   {
     id: 'faq-anticheat',
@@ -271,7 +272,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               href="#paket"
               className="hover:text-white hover:underline underline-offset-4 transition-colors whitespace-nowrap shrink-0"
             >
-              Paket
+              {PAYMENTS_ENABLED ? 'Paket' : 'Akses Gratis'}
             </a>
           </nav>
 
@@ -303,7 +304,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* Hero Copy */}
             <div className="lg:col-span-6 flex flex-col justify-center">
               <div className="text-xs font-medium text-emerald-400 mb-3">
-                Jaringan Pertukaran Trafik Indonesia · Terverifikasi Anti-Bot
+                {PAYMENTS_ENABLED
+                  ? 'Jaringan Pertukaran Trafik Indonesia · Terverifikasi Anti-Bot'
+                  : '100% Gratis Dicoba · Jaringan Pertukaran Trafik Indonesia Terverifikasi Anti-Bot'}
               </div>
 
               <h1
@@ -851,103 +854,211 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        {/* 5. Membership Comparison */}
+        {/* 5. Membership / Free Early Access Section */}
         <section id="paket" className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-14">
           <VwsTopLine bleed={false} />
-          <div className="max-w-2xl mb-10">
-            <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">
-              Pilih paket sesuai kebutuhan website Anda
-            </h2>
-            <p className="text-sm text-slate-400 mt-2">
-              Mulai gratis tanpa kartu kredit atau tingkatkan ke Pro Nusantara untuk rasio pertukaran 100%.
-            </p>
-          </div>
-
-          <div className="relative grid grid-cols-1 md:grid-cols-2 bg-slate-900/40">
-            <VwsGridFrame hasBackground overhangPx={20} bleedPx={20} />
-
-            {/* Free Plan */}
-            <div className="vws-grid-cell p-6 sm:p-8 flex flex-col justify-between hover:bg-slate-900/75">
-              <div>
-                <div className="flex items-center justify-between gap-4">
-                  <h3 className="text-lg font-bold text-slate-100">Member Gratis</h3>
-                  <span className="text-xs font-mono text-slate-400">Rp 0 / selamanya</span>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-400 mt-2">
-                  Cocok untuk blogger dan pemilik situs pemula yang ingin mulai bertukar kunjungan.
+          {PAYMENTS_ENABLED ? (
+            <>
+              <div className="max-w-2xl mb-10">
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">
+                  Pilih paket sesuai kebutuhan website Anda
+                </h2>
+                <p className="text-sm text-slate-400 mt-2">
+                  Mulai gratis tanpa kartu kredit atau tingkatkan ke Pro Nusantara untuk rasio pertukaran 100%.
                 </p>
-
-                <VwsRowDivider className="mt-6 mb-5" />
-                <ul className="space-y-3 text-sm text-slate-300">
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Bonus pendaftaran 1.500 poin awal</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Rasio perolehan selancar 70% (0.70 poin/kunjungan)</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Maksimal 3 slot kampanye website aktif</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Komisi referral 15% dari setiap teman baru</span>
-                  </li>
-                </ul>
               </div>
 
-              <button
-                onClick={() => scrollToAuth('register')}
-                className="mt-8 w-full py-2.5 px-4 border border-slate-700 hover:bg-slate-800 text-slate-100 text-xs font-semibold text-center transition-colors cursor-pointer"
-              >
-                Mulai Akun Gratis
-              </button>
-            </div>
+              <div className="relative grid grid-cols-1 md:grid-cols-2 bg-slate-900/40">
+                <VwsGridFrame hasBackground overhangPx={20} bleedPx={20} />
 
-            {/* Pro Plan */}
-            <div className="vws-grid-cell bg-slate-900/75 p-6 sm:p-8 flex flex-col justify-between hover:bg-slate-900/90">
-              <VwsColumnDivider visibleFrom="md" overhangPx={20} />
-              <VwsTopLine bleed={false} className="md:hidden" />
-              <div>
-                <div className="flex items-center justify-between gap-4">
-                  <h3 className="text-lg font-bold text-white">Pro Nusantara</h3>
-                  <span className="text-xs font-mono text-emerald-400 font-semibold">Rp 149.000 / bulan</span>
+                {/* Free Plan */}
+                <div className="vws-grid-cell p-6 sm:p-8 flex flex-col justify-between hover:bg-slate-900/75">
+                  <div>
+                    <div className="flex items-center justify-between gap-4">
+                      <h3 className="text-lg font-bold text-slate-100">Member Gratis</h3>
+                      <span className="text-xs font-mono text-slate-400">Rp 0 / selamanya</span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-400 mt-2">
+                      Cocok untuk blogger dan pemilik situs pemula yang ingin mulai bertukar kunjungan.
+                    </p>
+
+                    <VwsRowDivider className="mt-6 mb-5" />
+                    <ul className="space-y-3 text-sm text-slate-300">
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Bonus pendaftaran 1.500 poin awal</span>
+                      </li>
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Rasio perolehan selancar 70% (0.70 poin/kunjungan)</span>
+                      </li>
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Maksimal 3 slot kampanye website aktif</span>
+                      </li>
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Komisi referral 15% dari setiap teman baru</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={() => scrollToAuth('register')}
+                    className="mt-8 w-full py-2.5 px-4 border border-slate-700 hover:bg-slate-800 text-slate-100 text-xs font-semibold text-center transition-colors cursor-pointer"
+                  >
+                    Mulai Akun Gratis
+                  </button>
                 </div>
-                <p className="text-xs sm:text-sm text-slate-400 mt-2">
-                  Untuk bisnis, agensi SEO, dan penerbit yang membutuhkan volume trafik maksimal.
-                </p>
 
-                <VwsRowDivider className="mt-6 mb-5" />
-                <ul className="space-y-3 text-sm text-slate-200">
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Rasio perolehan penuh 100% (1.00 poin/kunjungan)</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Hingga 20 slot kampanye website aktif sekaligus</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Prioritas antrean rotasi regional & filter perangkat</span>
-                  </li>
-                  <li className="flex items-center gap-2.5">
-                    <Check className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <span>Pembayaran instan via QRIS & Virtual Account</span>
-                  </li>
-                </ul>
+                {/* Pro Plan */}
+                <div className="vws-grid-cell bg-slate-900/75 p-6 sm:p-8 flex flex-col justify-between hover:bg-slate-900/90">
+                  <VwsColumnDivider visibleFrom="md" overhangPx={20} />
+                  <VwsTopLine bleed={false} className="md:hidden" />
+                  <div>
+                    <div className="flex items-center justify-between gap-4">
+                      <h3 className="text-lg font-bold text-white">Pro Nusantara</h3>
+                      <span className="text-xs font-mono text-emerald-400 font-semibold">Rp 149.000 / bulan</span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-400 mt-2">
+                      Untuk bisnis, agensi SEO, dan penerbit yang membutuhkan volume trafik maksimal.
+                    </p>
+
+                    <VwsRowDivider className="mt-6 mb-5" />
+                    <ul className="space-y-3 text-sm text-slate-200">
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Rasio perolehan penuh 100% (1.00 poin/kunjungan)</span>
+                      </li>
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Hingga 20 slot kampanye website aktif sekaligus</span>
+                      </li>
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Prioritas antrean rotasi regional & filter perangkat</span>
+                      </li>
+                      <li className="flex items-center gap-2.5">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0" />
+                        <span>Pembayaran instan via QRIS & Virtual Account</span>
+                      </li>
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={() => onEnterWorkspace('dashboard')}
+                    className="mt-8 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold text-center transition-colors cursor-pointer"
+                  >
+                    Login & Lihat Detail Paket Pro
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="max-w-2xl mb-10">
+                <div className="text-xs font-mono uppercase tracking-wider text-emerald-400 font-semibold mb-2">
+                  PROGRAM AKSES AWAL · 100% GRATIS
+                </div>
+                <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-slate-100">
+                  Coba layanan {APP_NAME} sepenuhnya gratis tanpa biaya
+                </h2>
+                <p className="text-sm text-slate-400 mt-2">
+                  Tanpa kartu kredit, tanpa langganan bulanan. Register sekarang, klaim bonus 1.500 poin awal, dan mulai datangkan pengunjung asli dari seluruh Indonesia.
+                </p>
               </div>
 
-              <button
-                onClick={() => onEnterWorkspace('dashboard')}
-                className="mt-8 w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold text-center transition-colors cursor-pointer"
-              >
-                Login & Lihat Detail Paket Pro
-              </button>
-            </div>
-          </div>
+              <div className="relative grid grid-cols-1 md:grid-cols-12 bg-slate-900/50">
+                <VwsGridFrame hasBackground overhangPx={20} bleedPx={20} />
+
+                {/* Left: Free Access Offer */}
+                <div className="vws-grid-cell md:col-span-5 bg-emerald-500/10 p-6 sm:p-8 flex flex-col justify-between">
+                  <div>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-lg font-bold text-white">Akses Penuh Gratis</h3>
+                      <span className="px-2 py-0.5 text-[10px] font-mono font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300">
+                        TERBUKA UNTUK SEMUA
+                      </span>
+                    </div>
+                    <div className="mt-4 flex items-baseline gap-2">
+                      <span className="text-3xl sm:text-4xl font-bold font-mono tabular-nums text-emerald-400">
+                        Rp 0
+                      </span>
+                      <span className="text-xs text-slate-400">/ tanpa biaya tersembunyi</span>
+                    </div>
+                    <p className="text-xs sm:text-sm text-slate-300 mt-3 leading-relaxed">
+                      Cocok untuk blogger, toko online UMKM, portal berita, dan pemilik website yang ingin menguji trafik organik Indonesia secara langsung.
+                    </p>
+                  </div>
+
+                  <div className="mt-8 space-y-2.5">
+                    <button
+                      onClick={() => scrollToAuth('register')}
+                      className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-semibold inline-flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <span>Register Gratis — Bonus 1.500 Poin</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                    <p className="text-[11px] text-slate-400 text-center">
+                      Aktif instan · Langsung bisa mendaftarkan website Anda
+                    </p>
+                  </div>
+                </div>
+
+                {/* Right: Included Benefits */}
+                <div className="vws-grid-cell md:col-span-7 p-6 sm:p-8 flex flex-col justify-between">
+                  <VwsColumnDivider visibleFrom="md" overhangPx={20} />
+                  <VwsTopLine bleed={false} className="md:hidden" />
+
+                  <div>
+                    <div className="text-xs font-mono uppercase tracking-wider text-slate-400 font-semibold">
+                      SEMUA YANG ANDA DAPATKAN SECARA GRATIS
+                    </div>
+                    <VwsRowDivider className="mt-4 mb-5" />
+
+                    <ul className="space-y-3.5 text-sm text-slate-200">
+                      <li className="flex items-start gap-3">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold text-white">Bonus Pendaftaran 1.500 Poin Awal</span>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Langsung tersedia di saldo akun baru untuk memutar kunjungan pertama ke situs Anda.
+                          </p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold text-white">Autosurf Tanpa Batas & Bonus Harian +50 Poin</span>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Kumpulkan poin terus-menerus dari jaringan pengunjung Indonesia dengan perlindungan Anti-Cheat 6 lapis.
+                          </p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold text-white">3 Slot Website Aktif + Penargetan 38 Provinsi</span>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Atur durasi tayang, filter perangkat desktop/mobile, dan batas hit harian agar grafik analitik alami.
+                          </p>
+                        </div>
+                      </li>
+                      <li className="flex items-start gap-3">
+                        <Check className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+                        <div>
+                          <span className="font-semibold text-white">Komisi Referral 15% Pasif Selamanya</span>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Ajak sesama pemilik website dan dapatkan 15% poin tambahan otomatis dari setiap aktivitas selancar mereka.
+                          </p>
+                        </div>
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
         </section>
 
         {/* 6. Interactive New User Signup / Existing Member Entry */}
@@ -1155,7 +1266,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 Anti-Cheat
               </a>
               <a href="#paket" className="hover:text-slate-200 transition-colors">
-                Paket
+                {PAYMENTS_ENABLED ? 'Paket' : 'Akses Gratis'}
               </a>
               <button
                 onClick={() => onEnterWorkspace('help')}

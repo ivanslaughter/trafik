@@ -12,6 +12,7 @@ import {
   VwsTopLine,
   VwsRowDivider,
 } from './VwsSmartLine';
+import { PAYMENTS_ENABLED } from '../config/appConfig';
 
 export type FAQCategoryId = 'all' | 'anticheat' | 'points';
 
@@ -60,11 +61,14 @@ export const DEFAULT_HELP_FAQS: FAQItem[] = [
   {
     id: 'faq-points-ratio',
     category: 'points',
-    question: 'Bagaimana perhitungan konversi waktu selancar menjadi poin (Rasio 70% vs 100%)?',
-    answer:
-      'Member Gratis menerima rasio pertukaran 70% (kunjungan 30 detik bernilai 1.00 poin menghasilkan +0.70 poin ke saldo). Member Pro Nusantara VIP menerima rasio penuh 100% tanpa potongan (+1.00 poin penuh setiap kunjungan 30 detik).',
-    actionLabel: 'Lihat Paket & Upgrade VIP',
-    actionType: 'pricing',
+    question: PAYMENTS_ENABLED
+      ? 'Bagaimana perhitungan konversi waktu selancar menjadi poin (Rasio 70% vs 100%)?'
+      : 'Bagaimana perhitungan konversi waktu selancar menjadi poin?',
+    answer: PAYMENTS_ENABLED
+      ? 'Member Gratis menerima rasio pertukaran 70% (kunjungan 30 detik bernilai 1.00 poin menghasilkan +0.70 poin ke saldo). Member Pro Nusantara VIP menerima rasio penuh 100% tanpa potongan (+1.00 poin penuh setiap kunjungan 30 detik).'
+      : 'Setiap member baru langsung menerima bonus 1.500 poin awal secara gratis. Saat berselancar, Anda memperoleh rasio pertukaran 70% (kunjungan 30 detik bernilai 1.00 poin menghasilkan +0.70 poin ke saldo), ditambah bonus +50 poin harian setelah 30 menit selancar dan komisi referral 15%.',
+    actionLabel: PAYMENTS_ENABLED ? 'Lihat Paket & Upgrade VIP' : 'Buka Program Referral',
+    actionType: PAYMENTS_ENABLED ? 'pricing' : 'referral',
   },
   {
     id: 'faq-daily-bonus-referral',
@@ -155,7 +159,7 @@ export const FAQAccordion: React.FC<FAQAccordionProps> = ({
     {
       id: 'points',
       label: 'Poin, Rasio & Kampanye',
-      subtitle: '70% vs 100%, bonus & refund',
+      subtitle: PAYMENTS_ENABLED ? '70% vs 100%, bonus & refund' : 'Bonus 1.500, rasio & refund',
       count: counts.points,
       icon: <Coins className="w-4 h-4 text-amber-400 shrink-0" />,
     },

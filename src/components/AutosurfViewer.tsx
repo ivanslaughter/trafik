@@ -30,6 +30,7 @@ import {
 } from '../types';
 import { antiCheatEngine } from '../services/antiCheatEngine';
 import { HumanVerificationModal } from './HumanVerificationModal';
+import { PAYMENTS_ENABLED } from '../config/appConfig';
 
 interface AutosurfViewerProps {
   user: UserProfile;
@@ -1047,16 +1048,22 @@ export const AutosurfViewer: React.FC<AutosurfViewerProps> = ({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
-            <span>Ingin rasio poin 100% penuh?</span>
-            <button
-              type="button"
-              onClick={onOpenPricing}
-              className="text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2 cursor-pointer"
-            >
-              Upgrade Pro Nusantara
-            </button>
-          </div>
+          {PAYMENTS_ENABLED ? (
+            <div className="flex items-center gap-2">
+              <span>Ingin rasio poin 100% penuh?</span>
+              <button
+                type="button"
+                onClick={onOpenPricing}
+                className="text-amber-400 hover:text-amber-300 font-semibold underline underline-offset-2 cursor-pointer"
+              >
+                Upgrade Pro Nusantara
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-emerald-400/90 font-medium">
+              <span>100% Gratis · Kumpulkan Poin Tanpa Batas</span>
+            </div>
+          )}
         </div>
       </div>
 
