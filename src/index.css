@@ -163,10 +163,91 @@
   animation: trafikCityRipple var(--ring-dur, 3.6s) cubic-bezier(0.16, 1, 0.3, 1) var(--city-delay, 0s) infinite;
 }
 
+@keyframes trafikDevicePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 6px var(--dev-glow, rgba(16, 185, 129, 0.28)));
+    opacity: 0.9;
+  }
+  50% {
+    transform: scale(1.035);
+    filter: drop-shadow(0 0 18px var(--dev-glow-strong, rgba(16, 185, 129, 0.65)));
+    opacity: 1;
+  }
+}
+
+@keyframes trafikDashFlow {
+  0% {
+    stroke-dashoffset: 0;
+  }
+  100% {
+    stroke-dashoffset: -176;
+  }
+}
+
+@keyframes trafikBeamLifecycle {
+  0% {
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.88;
+  }
+  80% {
+    opacity: 0.82;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.trafik-hero-device {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: trafikDevicePulse var(--dev-dur, 3.2s) ease-in-out var(--dev-delay, 0s) infinite;
+}
+
+.trafik-hero-device-emitter {
+  fill: var(--dev-color, #10b981);
+  stroke: #0b1220;
+  stroke-width: 2.2;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: trafikCityGlow 2.4s ease-in-out var(--dev-delay, 0s) infinite;
+}
+
+.trafik-hero-device-ring {
+  fill: none;
+  stroke: var(--dev-color, #10b981);
+  stroke-width: 2.8;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: trafikCityRipple 2.8s cubic-bezier(0.16, 1, 0.3, 1) var(--dev-delay, 0s) infinite;
+}
+
+.trafik-hero-beam {
+  fill: none;
+  stroke: var(--beam-color, #22d3ee);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  stroke-dasharray: 12 10;
+  pointer-events: none;
+  filter: drop-shadow(0 0 6px var(--beam-color, #22d3ee));
+  animation:
+    trafikDashFlow var(--dash-dur, 2.2s) linear infinite,
+    trafikBeamLifecycle var(--beam-dur, 4.2s) ease-in-out forwards;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .trafik-hero-province,
   .trafik-hero-city-dot,
-  .trafik-hero-city-ring {
+  .trafik-hero-city-ring,
+  .trafik-hero-device,
+  .trafik-hero-device-emitter,
+  .trafik-hero-device-ring,
+  .trafik-hero-beam {
     animation: none !important;
   }
 
@@ -174,9 +255,14 @@
     fill-opacity: var(--prov-max-op, 0.42);
   }
 
-  .trafik-hero-city-ring {
+  .trafik-hero-city-ring,
+  .trafik-hero-device-ring {
     opacity: 0.35;
     transform: scale(1.8);
+  }
+
+  .trafik-hero-beam {
+    opacity: 0.55;
   }
 }
 

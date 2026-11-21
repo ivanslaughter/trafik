@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { Globe } from 'lucide-react';
 import { APP_NAME } from '../config/appConfig';
 import { wpAuthService, NetworkMapStatsResponse } from '../services/wordpressAuthService';
+import { VwsGridFrame, VwsColumnDivider, VwsTopLine } from './VwsSmartLine';
 
 /**
  * Direct local path to Boss's uploaded 38-province Indonesia hero SVG asset.
@@ -27,6 +28,73 @@ interface ProvinceMeta {
   capital: string;
   aliases: string[];
 }
+
+interface DeviceAnchor {
+  id: 'mobile' | 'laptop' | 'tablet';
+  x: number;
+  y: number;
+  childStart: number;
+  childEnd: number; // inclusive
+  color: string;
+  glow: string;
+  glowStrong: string;
+  delay: string;
+  dur: string;
+  /** Preferred x-range in SVG viewBox for organic balanced distribution */
+  preferMinX: number;
+  preferMaxX: number;
+}
+
+/**
+ * Exact anchor points & child element slices inside #Layer_2 of the uploaded SVG:
+ * - Mobile Phone (left): children 0..5, top-center (997.4, 1202)
+ * - Laptop (center): children 6..9, top-center (1439.6, 1201)
+ * - Tablet (right): children 10..11, top-center (1867.9, 1187)
+ */
+const DEVICE_ANCHORS: DeviceAnchor[] = [
+  {
+    id: 'mobile',
+    x: 997.4,
+    y: 1202,
+    childStart: 0,
+    childEnd: 5,
+    color: '#10b981',
+    glow: 'rgba(16, 185, 129, 0.32)',
+    glowStrong: 'rgba(16, 185, 129, 0.72)',
+    delay: '0s',
+    dur: '3.1s',
+    preferMinX: 300,
+    preferMaxX: 1380,
+  },
+  {
+    id: 'laptop',
+    x: 1439.6,
+    y: 1201,
+    childStart: 6,
+    childEnd: 9,
+    color: '#22d3ee',
+    glow: 'rgba(34, 211, 238, 0.32)',
+    glowStrong: 'rgba(34, 211, 238, 0.72)',
+    delay: '-1.05s',
+    dur: '3.5s',
+    preferMinX: 780,
+    preferMaxX: 1960,
+  },
+  {
+    id: 'tablet',
+    x: 1867.9,
+    y: 1187,
+    childStart: 10,
+    childEnd: 11,
+    color: '#818cf8',
+    glow: 'rgba(129, 140, 248, 0.32)',
+    glowStrong: 'rgba(129, 140, 248, 0.74)',
+    delay: '-2.1s',
+    dur: '3.3s',
+    preferMinX: 1400,
+    preferMaxX: 2560,
+  },
+];
 
 /**
  * Complete 38-province registry pairing every SVG province shape ID and capital dot ID.
@@ -139,6 +207,8 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const svgHostRef = useRef<HTMLDivElement | null>(null);
   const cityColorIndexRef = useRef<Map<string, number>>(new Map());
+  const cityCoordsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const liveStatsRef = useRef<NetworkMapStatsResponse | null>(null);
 
   const [svgReady, setSvgReady] = useState(false);
   const [svgError, setSvgError] = useState(false);
@@ -182,6 +252,7 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
       try {
         const res = await wpAuthService.fetchNetworkMapStats(false);
         if (active && res) {
+          liveStatsRef.current = res;
           setLiveStats(res);
         }
       } catch {
@@ -337,10 +408,54 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
           layer4.style.pointerEvents = 'none';
         }
 
+        const SVG_NS = 'http://www.w3.org/2000/svg';
+
+        // Wrap Mobile Phone, Laptop, and Tablet inside #Layer_2 for individual pulsating animation + emitter nodes
         const layer2 = svgEl.querySelector<SVGElement>('#Layer_2');
         if (layer2) {
-          layer2.style.opacity = '0.88';
           layer2.style.pointerEvents = 'none';
+          const rawChildren = Array.from(layer2.children);
+          if (rawChildren.length >= 12) {
+            const deviceGroups = DEVICE_ANCHORS.map((dev) => {
+              const g = doc.createElementNS(SVG_NS, 'g');
+              g.setAttribute('id', `trafik-device-${dev.id}`);
+              g.setAttribute('class', 'trafik-hero-device');
+              g.style.setProperty('--dev-color', dev.color);
+              g.style.setProperty('--dev-glow', dev.glow);
+              g.style.setProperty('--dev-glow-strong', dev.glowStrong);
+              g.style.setProperty('--dev-delay', dev.delay);
+              g.style.setProperty('--dev-dur', dev.dur);
+
+              for (let idx = dev.childStart; idx <= dev.childEnd; idx++) {
+                if (rawChildren[idx]) {
+                  g.appendChild(rawChildren[idx]);
+                }
+              }
+
+              // Add glowing emitter ring + node at top-center of each device
+              const emitterRing = doc.createElementNS(SVG_NS, 'circle');
+              emitterRing.setAttribute('cx', String(dev.x));
+              emitterRing.setAttribute('cy', String(dev.y));
+              emitterRing.setAttribute('r', '7.5');
+              emitterRing.setAttribute('class', 'trafik-hero-device-ring');
+              emitterRing.style.setProperty('--dev-color', dev.color);
+              emitterRing.style.setProperty('--dev-delay', dev.delay);
+              g.appendChild(emitterRing);
+
+              const emitterDot = doc.createElementNS(SVG_NS, 'circle');
+              emitterDot.setAttribute('cx', String(dev.x));
+              emitterDot.setAttribute('cy', String(dev.y));
+              emitterDot.setAttribute('r', '6.5');
+              emitterDot.setAttribute('class', 'trafik-hero-device-emitter');
+              emitterDot.style.setProperty('--dev-color', dev.color);
+              emitterDot.style.setProperty('--dev-delay', dev.delay);
+              g.appendChild(emitterDot);
+
+              return g;
+            });
+
+            deviceGroups.forEach((g) => layer2.appendChild(g));
+          }
         }
 
         // Hydrate all 38 province shapes
@@ -356,9 +471,19 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
           }
         });
 
-        // Hydrate all 38 provincial capital dots + inject concentric animated radar ripple rings
+        // Create dedicated layer for animated dashed device-to-city beams right beneath city dots
         const cityLayer = svgEl.querySelector('#Trafik___City');
-        const SVG_NS = 'http://www.w3.org/2000/svg';
+        const beamsLayer = doc.createElementNS(SVG_NS, 'g');
+        beamsLayer.setAttribute('id', 'Trafik___Device_Beams');
+        beamsLayer.setAttribute('pointer-events', 'none');
+        if (cityLayer && cityLayer.parentNode) {
+          cityLayer.parentNode.insertBefore(beamsLayer, cityLayer);
+        } else {
+          svgEl.appendChild(beamsLayer);
+        }
+
+        // Hydrate all 38 provincial capital dots + record exact coordinates + inject radar rings
+        cityCoordsRef.current.clear();
 
         PROVINCE_REGISTRY.forEach((meta) => {
           const seed = randomSeeds.get(meta.provinceSvgId);
@@ -366,6 +491,12 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
           if (cityEl && seed) {
             const cx = cityEl.getAttribute('cx') || '0';
             const cy = cityEl.getAttribute('cy') || '0';
+            const numX = parseFloat(cx);
+            const numY = parseFloat(cy);
+            if (!Number.isNaN(numX) && !Number.isNaN(numY)) {
+              cityCoordsRef.current.set(meta.citySvgId, { x: numX, y: numY });
+            }
+
             const initialColor = CITY_PALETTE[seed.colorIndex];
 
             // Scale dot slightly so all 38 capitals read clearly in the hero viewport
@@ -444,6 +575,166 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
     }, 4200);
 
     return () => window.clearInterval(timer);
+  }, [svgReady]);
+
+  // Continuously spawn random animated dashed signal arcs from Mobile, Laptop & Tablet to cities
+  useEffect(() => {
+    if (!svgReady) return;
+    const host = svgHostRef.current;
+    if (!host) return;
+
+    const beamsLayer = host.querySelector('#Trafik___Device_Beams');
+    if (!beamsLayer) return;
+
+    const SVG_NS = 'http://www.w3.org/2000/svg';
+    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const timeouts = new Set<number>();
+
+    // Helper: pick a random target city (preferring balanced geographic reach + live active cities)
+    const pickTargetCity = (dev: DeviceAnchor, excludeCityIds: Set<string>): ProvinceMeta | null => {
+      const candidates = PROVINCE_REGISTRY.filter((meta) => {
+        const coords = cityCoordsRef.current.get(meta.citySvgId);
+        return Boolean(coords) && !excludeCityIds.has(meta.citySvgId);
+      });
+      if (candidates.length === 0) return null;
+
+      // 72% chance to pick within the device's regional sweep, 28% chance for cross-archipelago hop
+      const useRegional = Math.random() < 0.72;
+      const regionalPool = candidates.filter((meta) => {
+        const c = cityCoordsRef.current.get(meta.citySvgId)!;
+        return c.x >= dev.preferMinX && c.x <= dev.preferMaxX;
+      });
+      const pool = useRegional && regionalPool.length > 0 ? regionalPool : candidates;
+
+      // Boost selection probability slightly for cities with live Trafik activity
+      const stats = liveStatsRef.current;
+      const weighted: { meta: ProvinceMeta; weight: number }[] = pool.map((meta) => {
+        const m = getLiveProvinceMetrics(stats, meta);
+        const weight = 1 + (m.surfers > 0 ? 2.5 : 0) + (m.dailyHits > 0 ? 1.2 : 0);
+        return { meta, weight };
+      });
+
+      const totalWeight = weighted.reduce((acc, item) => acc + item.weight, 0);
+      let roll = Math.random() * totalWeight;
+      for (const item of weighted) {
+        roll -= item.weight;
+        if (roll <= 0) return item.meta;
+      }
+      return pool[Math.floor(Math.random() * pool.length)];
+    };
+
+    // Build graceful upward quadratic Bezier arc from device anchor -> target capital city
+    const createBeamPath = (dev: DeviceAnchor, meta: ProvinceMeta, beamDurMs: number): SVGPathElement | null => {
+      const target = cityCoordsRef.current.get(meta.citySvgId);
+      if (!target) return null;
+
+      const dx = target.x - dev.x;
+      const dy = target.y - dev.y;
+      const dist = Math.hypot(dx, dy);
+
+      // Curvature bends gracefully outward/upward relative to horizontal span
+      const midX = (dev.x + target.x) * 0.5;
+      const midY = (dev.y + target.y) * 0.5;
+      const archLift = Math.min(260, Math.max(95, dist * 0.24));
+      const ctrlX = midX + (dx >= 0 ? -Math.min(110, Math.abs(dx) * 0.14) : Math.min(110, Math.abs(dx) * 0.14));
+      const ctrlY = Math.min(dev.y - 80, midY - archLift);
+
+      const path = document.createElementNS(SVG_NS, 'path');
+      path.setAttribute(
+        'd',
+        `M ${dev.x.toFixed(1)} ${dev.y.toFixed(1)} Q ${ctrlX.toFixed(1)} ${ctrlY.toFixed(1)} ${target.x.toFixed(1)} ${target.y.toFixed(1)}`
+      );
+      path.setAttribute('class', 'trafik-hero-beam');
+
+      // Use target city's current luminous palette color (fallback to device color)
+      const cityColorIdx = cityColorIndexRef.current.get(meta.citySvgId);
+      const beamColor =
+        cityColorIdx !== undefined ? CITY_PALETTE[cityColorIdx % CITY_PALETTE.length] : dev.color;
+
+      const dashDurSec = (1.6 + Math.random() * 1.1).toFixed(2);
+      path.style.setProperty('--beam-color', beamColor);
+      path.style.setProperty('--dash-dur', `${dashDurSec}s`);
+      path.style.setProperty('--beam-dur', `${(beamDurMs / 1000).toFixed(2)}s`);
+
+      return path;
+    };
+
+    // If user prefers reduced motion, draw 3 calm static dashed lines (1 per device)
+    if (reducedMotion) {
+      beamsLayer.innerHTML = '';
+      const used = new Set<string>();
+      DEVICE_ANCHORS.forEach((dev) => {
+        const meta = pickTargetCity(dev, used);
+        if (!meta) return;
+        used.add(meta.citySvgId);
+        const path = createBeamPath(dev, meta, 4000);
+        if (path) beamsLayer.appendChild(path);
+      });
+      return () => {
+        beamsLayer.innerHTML = '';
+      };
+    }
+
+    // Track currently active target city IDs across 6 independent beam slots (2 per device)
+    const activeTargets = new Map<number, string>();
+    const activeElements = new Map<number, SVGPathElement>();
+    let disposed = false;
+
+    const scheduleSlot = (slotIdx: number, dev: DeviceAnchor, initialDelayMs: number) => {
+      const startTimer = window.setTimeout(() => {
+        timeouts.delete(startTimer);
+        if (disposed) return;
+
+        // Clean up any previous element in this slot
+        const prevEl = activeElements.get(slotIdx);
+        if (prevEl && prevEl.parentNode) {
+          prevEl.parentNode.removeChild(prevEl);
+        }
+        activeElements.delete(slotIdx);
+        activeTargets.delete(slotIdx);
+
+        // If tab is hidden, wait quietly and retry shortly
+        if (document.hidden) {
+          scheduleSlot(slotIdx, dev, 1500);
+          return;
+        }
+
+        const usedCityIds = new Set<string>(activeTargets.values());
+        const targetMeta = pickTargetCity(dev, usedCityIds);
+        if (!targetMeta) {
+          scheduleSlot(slotIdx, dev, 1200);
+          return;
+        }
+
+        const beamDurMs = 3400 + Math.floor(Math.random() * 2000); // 3.4s - 5.4s lifecycle
+        const pathEl = createBeamPath(dev, targetMeta, beamDurMs);
+        if (pathEl) {
+          beamsLayer.appendChild(pathEl);
+          activeElements.set(slotIdx, pathEl);
+          activeTargets.set(slotIdx, targetMeta.citySvgId);
+        }
+
+        // Schedule next random city hop right as this beam finishes fading out
+        const gapMs = 260 + Math.floor(Math.random() * 640);
+        scheduleSlot(slotIdx, dev, beamDurMs + gapMs);
+      }, initialDelayMs);
+
+      timeouts.add(startTimer);
+    };
+
+    // Launch 2 staggered beams from each of the 3 devices (6 total concurrent random dashed arcs)
+    let slotCounter = 0;
+    DEVICE_ANCHORS.forEach((dev, devIdx) => {
+      scheduleSlot(slotCounter++, dev, 150 + devIdx * 420);
+      scheduleSlot(slotCounter++, dev, 1750 + devIdx * 520);
+    });
+
+    return () => {
+      disposed = true;
+      timeouts.forEach((id) => window.clearTimeout(id));
+      timeouts.clear();
+      beamsLayer.innerHTML = '';
+    };
   }, [svgReady]);
 
   // Delegated pointer hover detection across all 38 provinces & 38 capital dots
@@ -525,16 +816,10 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
       ref={containerRef}
       onPointerMove={handlePointerMove}
       onPointerLeave={handlePointerLeave}
-      className="relative h-full min-h-[300px] sm:min-h-[370px] flex flex-col justify-between overflow-hidden border border-slate-800 bg-[#0f172a]"
+      className="relative w-full flex flex-col justify-between bg-transparent"
     >
-      {/* Subtle architectural radial ambience behind the 38-province archipelago */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_42%,rgba(16,185,129,0.12),rgba(15,23,42,0)_68%)]"
-      />
-
       {/* Top micro header strip */}
-      <div className="relative z-10 flex items-center justify-between gap-3 px-4 pt-3.5 pb-1 text-[11px] text-slate-400">
+      <div className="relative z-10 flex items-center justify-between gap-3 pb-1 text-[11px] text-slate-400">
         <span className="font-mono uppercase tracking-[0.14em] text-slate-300">
           Jaringan 38 Provinsi · Indonesia
         </span>
@@ -545,8 +830,8 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
         </span>
       </div>
 
-      {/* Inline Animated 38-Province SVG Canvas */}
-      <div className="relative z-10 flex-1 flex items-center justify-center px-2 sm:px-3 py-1">
+      {/* Inline Animated 38-Province SVG Canvas — Enlarged via Negative Margins */}
+      <div className="relative z-0 -mx-6 sm:-mx-10 lg:-mx-14 -my-5 sm:-my-8 lg:-my-10">
         {!svgError ? (
           <div
             ref={svgHostRef}
@@ -555,7 +840,7 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
             }`}
           />
         ) : (
-          <div className="w-full h-full min-h-[220px] flex flex-col items-center justify-center p-8 text-center">
+          <div className="w-full min-h-[260px] flex flex-col items-center justify-center p-8 text-center">
             <Globe className="w-11 h-11 text-emerald-400 mb-3" />
             <div className="text-sm font-semibold text-slate-200">{APP_NAME} Nusantara</div>
             <div className="text-xs text-slate-400 mt-1">
@@ -598,29 +883,35 @@ export const HeroIndonesiaAnimatedMap: React.FC = () => {
         </div>
       )}
 
-      {/* Overall Live Trafik Network Stats Footer Bar */}
-      <div className="relative z-10 border-t border-slate-800/90 bg-slate-950/70 backdrop-blur-xs grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x divide-slate-800/80">
-        <div className="px-3.5 py-2.5">
+      {/* Overall Live Trafik Stats — Transparent Slate Boxes Grid with Signature vws-line */}
+      <div className="relative z-10 mt-3 grid grid-cols-2 sm:grid-cols-4 bg-slate-900/45 backdrop-blur-xs">
+        <VwsGridFrame hasBackground={true} overhangPx={16} bleedPx={16} />
+        <div className="vws-grid-cell px-4 py-3 hover:bg-slate-900/65">
           <div className="text-[10px] uppercase tracking-wider text-slate-400">Surfer Aktif</div>
-          <div className="text-sm font-mono tabular-nums font-semibold text-emerald-400 mt-0.5">
+          <div className="text-base font-mono tabular-nums font-semibold text-emerald-400 mt-0.5">
             {liveStats ? formatCompactNumber(liveStats.totalSurfers) : '—'}
           </div>
         </div>
-        <div className="px-3.5 py-2.5">
+        <div className="vws-grid-cell px-4 py-3 hover:bg-slate-900/65">
+          <VwsColumnDivider visibleFrom="always" overhangPx={16} />
           <div className="text-[10px] uppercase tracking-wider text-slate-400">Hits 24 Jam</div>
-          <div className="text-sm font-mono tabular-nums font-semibold text-cyan-300 mt-0.5">
+          <div className="text-base font-mono tabular-nums font-semibold text-cyan-300 mt-0.5">
             {liveStats ? formatCompactNumber(liveStats.totalHits24h) : '—'}
           </div>
         </div>
-        <div className="px-3.5 py-2.5">
+        <div className="vws-grid-cell px-4 py-3 hover:bg-slate-900/65">
+          <VwsColumnDivider visibleFrom="sm" overhangPx={16} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <div className="text-[10px] uppercase tracking-wider text-slate-400">Kampanye</div>
-          <div className="text-sm font-mono tabular-nums font-semibold text-slate-100 mt-0.5">
+          <div className="text-base font-mono tabular-nums font-semibold text-slate-100 mt-0.5">
             {liveStats ? formatCompactNumber(liveStats.activeCampaigns) : '—'}
           </div>
         </div>
-        <div className="px-3.5 py-2.5">
+        <div className="vws-grid-cell px-4 py-3 hover:bg-slate-900/65">
+          <VwsColumnDivider visibleFrom="always" overhangPx={16} />
+          <VwsTopLine bleed={false} className="sm:hidden" />
           <div className="text-[10px] uppercase tracking-wider text-slate-400">Member</div>
-          <div className="text-sm font-mono tabular-nums font-semibold text-amber-300 mt-0.5">
+          <div className="text-base font-mono tabular-nums font-semibold text-amber-300 mt-0.5">
             {liveStats ? formatCompactNumber(liveStats.registeredUsers) : '—'}
           </div>
         </div>
