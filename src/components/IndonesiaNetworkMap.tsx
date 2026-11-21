@@ -1310,13 +1310,13 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
                 disabled={isRefreshingFeed}
                 title={
                   lastSyncedTime
-                    ? `Data Real-Time MySQL (sinkron terakhir ${lastSyncedTime}). Klik untuk perbarui sekarang.`
-                    : 'Perbarui data langsung dari WordPress MySQL'
+                    ? `Live Data Real-Time (sinkron terakhir ${lastSyncedTime}). Klik untuk perbarui sekarang.`
+                    : 'Perbarui Live Data sekarang'
                 }
                 className="hidden sm:flex items-center gap-1.5 text-[10px] font-mono text-emerald-300 hover:text-emerald-200 px-2 py-1 rounded-md bg-emerald-950/60 border border-emerald-800/50 cursor-pointer transition-colors disabled:opacity-60"
               >
                 <RefreshCw className={`w-3 h-3 ${isRefreshingFeed ? 'animate-spin' : ''}`} />
-                <span>MySQL Live</span>
+                <span>Live Data</span>
               </button>
             </>
           )}
@@ -1554,7 +1554,7 @@ export const IndonesiaNetworkMap: React.FC<IndonesiaNetworkMapProps> = ({
               <span className="text-slate-700">·</span>
               <span className="text-[10px] text-slate-500 font-mono">
                 {isLiveMysqlFeed
-                  ? `Live MySQL${lastSyncedTime ? ` · ${lastSyncedTime}` : ''}`
+                  ? `Live Data${lastSyncedTime ? ` · ${lastSyncedTime}` : ''}`
                   : 'Live Ranking'}
               </span>
             </div>

@@ -172,7 +172,7 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
             {isLiveMysql ? (
               <span className="inline-flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-none bg-emerald-950/70 text-emerald-300 border border-emerald-800/50 font-mono font-medium">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                Live MySQL
+                Live Data
               </span>
             ) : (
               <span className="text-[10px] px-2 py-0.5 rounded-none bg-slate-800 text-slate-300 border border-slate-700/60 font-mono font-medium">
@@ -366,8 +366,8 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
           <Info className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           <span>
             {isLiveMysql
-              ? 'Data agregasi harian real-time langsung dari database MySQL (diperbarui otomatis tiap 30 detik).'
-              : 'Menampilkan data simulasi pratinjau. Login dengan akun WordPress Bridge untuk grafik MySQL real-time.'}
+              ? 'Data agregasi harian real-time langsung dari server (diperbarui otomatis tiap 30 detik).'
+              : 'Menampilkan data simulasi pratinjau. Login dengan akun member untuk grafik Live Data real-time.'}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -375,7 +375,7 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
             {isLiveMysql
               ? lastSyncedTime
                 ? `Sync: ${lastSyncedTime}`
-                : 'Live MySQL'
+                : 'Live Data'
               : 'Preview Demo'}
           </span>
           {isLiveMysql && onManualRefresh && (
@@ -383,7 +383,7 @@ export const UserWeeklyTrendChart: React.FC<UserWeeklyTrendChartProps> = ({
               type="button"
               onClick={onManualRefresh}
               disabled={isRefreshingLive}
-              title="Segarkan grafik tren 7 hari dari MySQL"
+              title="Segarkan grafik tren 7 hari (Live Data)"
               className="text-emerald-400 hover:text-emerald-300 transition-colors cursor-pointer disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshingLive ? 'animate-spin' : ''}`} />
