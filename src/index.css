@@ -280,3 +280,323 @@
   }
 }
 
+/* ============================================================================
+   Anti-Cheat 6-Layer Animated SVG (#keamanan Card)
+   ============================================================================ */
+.trafik-anticheat-svg-stage svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@keyframes trafikAcShieldPulse {
+  0%,
+  100% {
+    transform: translateY(0px) scale(1);
+    filter: drop-shadow(0 8px 16px rgba(110, 193, 128, 0.2));
+  }
+  18% {
+    transform: translateY(-12px) scale(1.024);
+    filter: drop-shadow(0 14px 32px rgba(110, 193, 128, 0.56));
+  }
+  42% {
+    transform: translateY(-7px) scale(1.012);
+    filter: drop-shadow(0 10px 24px rgba(110, 193, 128, 0.38));
+  }
+  68% {
+    transform: translateY(-2px) scale(1.003);
+    filter: drop-shadow(0 8px 18px rgba(110, 193, 128, 0.24));
+  }
+}
+
+@keyframes trafikAcShieldWave {
+  0% {
+    transform: translateY(-6px) scale(0.995);
+    opacity: 0;
+    stroke-width: 14;
+  }
+  12% {
+    transform: translateY(-10px) scale(1.015);
+    opacity: 0.72;
+    stroke-width: 10;
+  }
+  58% {
+    transform: translateY(-14px) scale(1.1);
+    opacity: 0;
+    stroke-width: 2;
+  }
+  100% {
+    transform: translateY(-14px) scale(1.1);
+    opacity: 0;
+    stroke-width: 2;
+  }
+}
+
+@keyframes trafikAcShieldWingTrace {
+  0% {
+    stroke-dashoffset: 118;
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  52% {
+    stroke-dashoffset: -28;
+    opacity: 0.9;
+  }
+  62% {
+    stroke-dashoffset: -36;
+    opacity: 0;
+  }
+  100% {
+    stroke-dashoffset: -36;
+    opacity: 0;
+  }
+}
+
+@keyframes trafikAcShieldSheen {
+  0%,
+  16% {
+    transform: translateX(-320px) skewX(-24deg);
+    opacity: 0;
+  }
+  26% {
+    opacity: 0.95;
+  }
+  56% {
+    transform: translateX(920px) skewX(-24deg);
+    opacity: 0.95;
+  }
+  66%,
+  100% {
+    transform: translateX(920px) skewX(-24deg);
+    opacity: 0;
+  }
+}
+
+@keyframes trafikAcCheckedPop {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 6px rgba(110, 193, 128, 0.28));
+  }
+  12% {
+    transform: scale(1.12) rotate(-2deg);
+    filter: drop-shadow(0 0 24px rgba(110, 193, 128, 0.88));
+  }
+  24% {
+    transform: scale(0.97) rotate(0.6deg);
+    filter: drop-shadow(0 0 12px rgba(110, 193, 128, 0.48));
+  }
+  34% {
+    transform: scale(1.03) rotate(0deg);
+    filter: drop-shadow(0 0 14px rgba(110, 193, 128, 0.5));
+  }
+  44% {
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 6px rgba(110, 193, 128, 0.28));
+  }
+}
+
+@keyframes trafikAcLine1Flow {
+  0% {
+    stroke-dashoffset: 108;
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  82% {
+    opacity: 0.9;
+  }
+  100% {
+    stroke-dashoffset: -24;
+    opacity: 0;
+  }
+}
+
+@keyframes trafikAcLine1TrackBreath {
+  0%,
+  100% {
+    opacity: 0.72;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes trafikAcLine1DotPulse {
+  0%,
+  100% {
+    transform: scale(1);
+    fill: #abafb3;
+  }
+  55% {
+    transform: scale(1.05);
+    fill: #abafb3;
+  }
+  75% {
+    transform: scale(1.26);
+    fill: #6ec180;
+  }
+  88% {
+    transform: scale(1.08);
+    fill: #c7f0d1;
+  }
+}
+
+@keyframes trafikAcLine2BaseBreath {
+  0%,
+  100% {
+    opacity: 0.36;
+  }
+  50% {
+    opacity: 0.78;
+  }
+}
+
+@keyframes trafikAcLine2ScanForward {
+  0% {
+    stroke-dashoffset: 112;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.78;
+  }
+  80% {
+    opacity: 0.65;
+  }
+  100% {
+    stroke-dashoffset: -18;
+    opacity: 0;
+  }
+}
+
+@keyframes trafikAcLine2ScanReverse {
+  0% {
+    stroke-dashoffset: -18;
+    opacity: 0;
+  }
+  15% {
+    opacity: 0.78;
+  }
+  80% {
+    opacity: 0.65;
+  }
+  100% {
+    stroke-dashoffset: 112;
+    opacity: 0;
+  }
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-shield {
+  transform-box: fill-box;
+  transform-origin: 50% 52%;
+  will-change: transform, filter;
+  animation: trafikAcShieldPulse 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-shield-wave {
+  fill: none;
+  stroke: #6ec180;
+  stroke-linejoin: round;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: 50% 52%;
+  filter: drop-shadow(0 0 12px rgba(110, 193, 128, 0.75));
+  animation: trafikAcShieldWave 3.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-shield-wave--secondary {
+  stroke: #a7f3d0;
+  animation-delay: 0.24s;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-shield-energy-wing {
+  fill: none;
+  stroke: #d1fae5;
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-dasharray: 24 94;
+  pointer-events: none;
+  filter: drop-shadow(0 0 10px rgba(209, 250, 229, 0.92));
+  animation: trafikAcShieldWingTrace 3.4s cubic-bezier(0.25, 0.8, 0.25, 1) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-shield-sheen {
+  pointer-events: none;
+  mix-blend-mode: screen;
+  animation: trafikAcShieldSheen 3.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-checked {
+  transform-box: fill-box;
+  transform-origin: center;
+  will-change: transform, filter;
+  animation: trafikAcCheckedPop 3.4s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-line1-track {
+  animation: trafikAcLine1TrackBreath var(--l1-dur, 3.2s) ease-in-out var(--l1-delay, 0s) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-line1-dot {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: trafikAcLine1DotPulse var(--l1-dur, 3.2s) ease-in-out var(--l1-delay, 0s) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-line1-pulse {
+  fill: none;
+  stroke: #6ec180;
+  stroke-width: 6.4;
+  stroke-linecap: round;
+  stroke-dasharray: 20 88;
+  pointer-events: none;
+  filter: drop-shadow(0 0 8px rgba(110, 193, 128, 0.85));
+  animation: trafikAcLine1Flow var(--l1-dur, 3.2s) cubic-bezier(0.4, 0, 0.2, 1) var(--l1-delay, 0s) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-line2-base {
+  animation: trafikAcLine2BaseBreath var(--l2-dur, 4.4s) ease-in-out var(--l2-delay, 0s) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-line2-scan {
+  fill: none;
+  stroke: rgba(110, 193, 128, 0.72);
+  stroke-width: 5.4;
+  stroke-linecap: round;
+  stroke-dasharray: 16 96;
+  pointer-events: none;
+  animation: trafikAcLine2ScanForward var(--l2-scan-dur, 4.8s) linear var(--l2-delay, 0s) infinite;
+}
+
+.trafik-anticheat-svg-stage .trafik-ac-line2-scan--reverse {
+  stroke: rgba(203, 213, 225, 0.56);
+  animation-name: trafikAcLine2ScanReverse;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .trafik-anticheat-svg-stage .trafik-ac-shield,
+  .trafik-anticheat-svg-stage .trafik-ac-shield-wave,
+  .trafik-anticheat-svg-stage .trafik-ac-shield-energy-wing,
+  .trafik-anticheat-svg-stage .trafik-ac-shield-sheen,
+  .trafik-anticheat-svg-stage .trafik-ac-checked,
+  .trafik-anticheat-svg-stage .trafik-ac-line1-track,
+  .trafik-anticheat-svg-stage .trafik-ac-line1-dot,
+  .trafik-anticheat-svg-stage .trafik-ac-line1-pulse,
+  .trafik-anticheat-svg-stage .trafik-ac-line2-base,
+  .trafik-anticheat-svg-stage .trafik-ac-line2-scan {
+    animation: none !important;
+  }
+
+  .trafik-anticheat-svg-stage .trafik-ac-shield-wave,
+  .trafik-anticheat-svg-stage .trafik-ac-shield-energy-wing,
+  .trafik-anticheat-svg-stage .trafik-ac-shield-sheen,
+  .trafik-anticheat-svg-stage .trafik-ac-line1-pulse,
+  .trafik-anticheat-svg-stage .trafik-ac-line2-scan {
+    opacity: 0;
+  }
+}
+
+

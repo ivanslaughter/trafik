@@ -24,7 +24,7 @@ import { BrandMark } from './BrandMark';
 import { VwsTopLine, VwsBottomLine, VwsColumnDivider, VwsGridFrame, VwsRowDivider } from './VwsSmartLine';
 import { HeroIndonesiaAnimatedMap } from './HeroIndonesiaAnimatedMap';
 import regionalTargetingImg from '../assets/images/vel_regional_targeting_1795023164349.webp';
-import anticheatGuardImg from '../assets/images/vel_anticheat_guard_1795023165931.webp';
+import { AntiCheatAnimatedSvg } from './AntiCheatAnimatedSvg';
 import contentAuditImg from '../assets/images/vel_content_audit_1795023165678.webp';
 import trafficRotationImg from '../assets/images/vel_traffic_rotation_1795023166516.webp';
 
@@ -509,21 +509,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               className="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col"
             >
               <div className="aspect-[4/3] w-full bg-[#0f172a] overflow-hidden border-b border-slate-800">
-                {!failedImages['anticheat'] ? (
-                  <img
-                    src={anticheatGuardImg}
-                    alt="Ilustrasi perisai keamanan browser dan verifikasi interaksi pengguna"
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    decoding="async"
-                    onError={() => markImageFailed('anticheat')}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <ShieldCheck className="w-10 h-10 text-emerald-400" />
-                  </div>
-                )}
+                <AntiCheatAnimatedSvg />
               </div>
 
               <div className="p-6 flex-1 flex flex-col justify-between">
