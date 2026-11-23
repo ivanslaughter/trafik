@@ -26,6 +26,7 @@ import {
   saveStoredBrandLogo,
   applyBrandFavicon,
 } from './utils/logoBranding';
+import { pushGtmPageView } from './utils/gtm';
 
 // Route & modal code-splitting for fast 4G mobile loading
 const LandingPage = React.lazy(() =>
@@ -92,12 +93,11 @@ export default function App() {
   // Navigation State
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
 
-  // Dynamic Document Title based on current view & APP_NAME
+  // Track initial render so GTM's built-in page load trigger isn't double-counted
+  const hasTrackedInitialViewRef = useRef<boolean>(false);
+
+  // Dynamic Document Title + GTM SPA virtual page view tracking
   useEffect(() => {
-    if (showLanding) {
-      document.title = getPageTitle();
-      return;
-    }
     const tabLabels: Record<string, string> = {
       dashboard: 'Dashboard',
       autosurf: 'Selancar Otomatis',
@@ -108,8 +108,16 @@ export default function App() {
       audit: 'Audit Kepatuhan',
       help: 'Panduan & Bantuan',
     };
-    const currentLabel = tabLabels[currentTab];
-    document.title = getPageTitle(currentLabel);
+
+    const nextTitle = showLanding ? getPageTitle() : getPageTitle(tabLabels[currentTab]);
+    const nextPath = showLanding ? '/' : `/${currentTab}`;
+    document.title = nextTitle;
+
+    if (hasTrackedInitialViewRef.current) {
+      pushGtmPageView(nextPath, nextTitle);
+    } else {
+      hasTrackedInitialViewRef.current = true;
+    }
   }, [currentTab, showLanding]);
 
   // All Users Database
