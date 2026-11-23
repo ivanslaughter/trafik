@@ -428,9 +428,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* 01. Regional Targeting (col-span-2) */}
             <div
               id="jangkauan"
-              className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col justify-between"
+              className="lg:col-span-2 relative bg-slate-900/60 flex flex-col justify-between vws-grid-cell hover:bg-slate-900/75"
             >
-              <div className="grid grid-cols-1 md:grid-cols-12 items-stretch">
+              <VwsGridFrame hasBackground overhangPx={14} bleedPx={14} />
+
+              <div className="grid grid-cols-1 md:grid-cols-12 items-stretch h-full">
                 <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-between">
                   <div>
                     <div className="text-xs font-mono text-emerald-400 mb-2">
@@ -455,7 +457,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                             key={reg.id}
                             type="button"
                             onClick={() => setSelectedRegion(reg)}
-                            className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                            className={`px-2.5 py-1.5 text-xs font-medium transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                               active
                                 ? 'bg-emerald-600 text-white'
                                 : 'bg-slate-950 border border-slate-800 text-slate-300 hover:border-slate-700'
@@ -467,7 +469,8 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       })}
                     </div>
 
-                    <div className="flex items-center justify-between gap-4 text-xs text-slate-300 bg-slate-950/70 rounded-xl p-3.5 border border-slate-800/80">
+                    <div className="relative flex items-center justify-between gap-4 text-xs text-slate-300 bg-slate-950/70 p-3.5">
+                      <VwsGridFrame hasBackground overhangPx={10} bleedPx={10} />
                       <div className="min-w-0">
                         <div className="font-semibold text-slate-100">{selectedRegion.name}</div>
                         <div className="text-slate-400 mt-0.5 truncate">{selectedRegion.cities}</div>
@@ -483,22 +486,26 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 </div>
 
                 {/* Regional Targeting Vector Illustration */}
-                <div className="md:col-span-5 bg-[#0f172a] border-t md:border-t-0 md:border-l border-slate-800 min-h-[220px]">
-                  {!failedImages['regional'] ? (
-                    <img
-                      src={regionalTargetingImg}
-                      alt="Ilustrasi vektor penargetan geografis laptop dan ponsel ke pin lokasi"
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      decoding="async"
-                      onError={() => markImageFailed('regional')}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center p-6">
-                      <Globe className="w-10 h-10 text-emerald-400" />
-                    </div>
-                  )}
+                <div className="relative md:col-span-5 bg-[#0f172a] min-h-[220px]">
+                  <VwsColumnDivider visibleFrom="md" overhangPx={0} />
+                  <VwsTopLine bleed={false} className="md:hidden" />
+                  <div className="w-full h-full overflow-hidden">
+                    {!failedImages['regional'] ? (
+                      <img
+                        src={regionalTargetingImg}
+                        alt="Ilustrasi vektor penargetan geografis laptop dan ponsel ke pin lokasi"
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
+                        onError={() => markImageFailed('regional')}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-6">
+                        <Globe className="w-10 h-10 text-emerald-400" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -506,10 +513,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {/* 02. 6-Layer Anti-Cheat (col-span-1) */}
             <div
               id="keamanan"
-              className="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col"
+              className="relative bg-slate-900/60 flex flex-col vws-grid-cell hover:bg-slate-900/75"
             >
-              <div className="aspect-[4/3] w-full bg-[#0f172a] overflow-hidden border-b border-slate-800">
+              <VwsGridFrame hasBackground overhangPx={14} bleedPx={14} />
+
+              <div className="relative aspect-[4/3] w-full bg-[#0f172a] overflow-hidden">
                 <AntiCheatAnimatedSvg />
+                <VwsBottomLine bleed={false} />
               </div>
 
               <div className="p-6 flex-1 flex flex-col justify-between">
@@ -525,27 +535,31 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   </p>
                 </div>
 
-                <VwsRowDivider className="mt-5 mb-4" />
-                <ul className="space-y-2 text-xs text-slate-300">
-                  <li className="flex items-start gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Tab Focus & Visibility Lock otomatis</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Analisis Entropi Kursor & Uji Proof-of-Presence</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
-                    <span>Kunci Multi-Tab (1 sesi aktif per perangkat)</span>
-                  </li>
-                </ul>
+                <div className="mt-5">
+                  <VwsRowDivider className="mb-4" />
+                  <ul className="space-y-2 text-xs text-slate-300">
+                    <li className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Tab Focus & Visibility Lock otomatis</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Analisis Entropi Kursor & Uji Proof-of-Presence</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <Check className="w-3.5 h-3.5 text-emerald-400 shrink-0 mt-0.5" />
+                      <span>Kunci Multi-Tab (1 sesi aktif per perangkat)</span>
+                    </li>
+                  </ul>
+                </div>
               </div>
             </div>
 
             {/* 03. Anti-Gambling & Content Compliance (col-span-1) */}
-            <div className="rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col">
-              <div className="aspect-[4/3] w-full bg-[#0f172a] overflow-hidden border-b border-slate-800">
+            <div className="relative bg-slate-900/60 flex flex-col vws-grid-cell hover:bg-slate-900/75">
+              <VwsGridFrame hasBackground overhangPx={14} bleedPx={14} />
+
+              <div className="relative aspect-[4/3] w-full bg-[#0f172a] overflow-hidden">
                 {!failedImages['audit'] ? (
                   <img
                     src={contentAuditImg}
@@ -561,7 +575,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     <ShieldCheck className="w-10 h-10 text-emerald-400" />
                   </div>
                 )}
+                <VwsBottomLine bleed={false} />
               </div>
+
               <div className="p-6 flex-1 flex flex-col justify-between">
                 <div>
                   <div className="text-xs font-mono text-emerald-400 mb-2">
@@ -578,7 +594,9 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             </div>
 
             {/* 04. Automated Rotation & Campaign Control (col-span-2) */}
-            <div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60 overflow-hidden flex flex-col justify-between">
+            <div className="lg:col-span-2 relative bg-slate-900/60 flex flex-col justify-between vws-grid-cell hover:bg-slate-900/75">
+              <VwsGridFrame hasBackground overhangPx={14} bleedPx={14} />
+
               <div className="grid grid-cols-1 md:grid-cols-12 items-stretch h-full">
                 <div className="md:col-span-7 p-6 sm:p-8 flex flex-col justify-between">
                   <div>
@@ -593,48 +611,54 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                     </p>
                   </div>
 
-                  <VwsRowDivider className="mt-6 mb-5" />
-                  <div className="relative grid grid-cols-1 sm:grid-cols-3 bg-slate-950/70 text-xs">
-                    <VwsGridFrame hasBackground overhangPx={12} bleedPx={12} />
-                    <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
-                      <Clock className="w-4 h-4 text-emerald-400 mb-2" />
-                      <div className="font-semibold text-slate-100">Durasi 15–60 Detik</div>
-                      <div className="text-slate-400 mt-1">Sesuaikan lama kunjungan tiap halaman</div>
-                    </div>
-                    <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
-                      <VwsColumnDivider visibleFrom="sm" overhangPx={12} />
-                      <VwsTopLine bleed={false} className="sm:hidden" />
-                      <SlidersHorizontal className="w-4 h-4 text-emerald-400 mb-2" />
-                      <div className="font-semibold text-slate-100">Batas Hit Harian</div>
-                      <div className="text-slate-400 mt-1">Jaga pertumbuhan trafik tetap stabil</div>
-                    </div>
-                    <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
-                      <VwsColumnDivider visibleFrom="sm" overhangPx={12} />
-                      <VwsTopLine bleed={false} className="sm:hidden" />
-                      <BarChart3 className="w-4 h-4 text-emerald-400 mb-2" />
-                      <div className="font-semibold text-slate-100">Laporan Real-Time</div>
-                      <div className="text-slate-400 mt-1">Pantau hit terkirim & sisa poin aktif</div>
+                  <div className="mt-6">
+                    <VwsRowDivider className="mb-5" />
+                    <div className="relative grid grid-cols-1 sm:grid-cols-3 bg-slate-950/70 text-xs">
+                      <VwsGridFrame hasBackground overhangPx={10} bleedPx={10} />
+                      <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
+                        <Clock className="w-4 h-4 text-emerald-400 mb-2" />
+                        <div className="font-semibold text-slate-100">Durasi 15–60 Detik</div>
+                        <div className="text-slate-400 mt-1">Sesuaikan lama kunjungan tiap halaman</div>
+                      </div>
+                      <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
+                        <VwsColumnDivider visibleFrom="sm" overhangPx={10} />
+                        <VwsTopLine bleed={false} className="sm:hidden" />
+                        <SlidersHorizontal className="w-4 h-4 text-emerald-400 mb-2" />
+                        <div className="font-semibold text-slate-100">Batas Hit Harian</div>
+                        <div className="text-slate-400 mt-1">Jaga pertumbuhan trafik tetap stabil</div>
+                      </div>
+                      <div className="vws-grid-cell p-3.5 hover:bg-slate-900/60">
+                        <VwsColumnDivider visibleFrom="sm" overhangPx={10} />
+                        <VwsTopLine bleed={false} className="sm:hidden" />
+                        <BarChart3 className="w-4 h-4 text-emerald-400 mb-2" />
+                        <div className="font-semibold text-slate-100">Laporan Real-Time</div>
+                        <div className="text-slate-400 mt-1">Pantau hit terkirim & sisa poin aktif</div>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Traffic Rotation Vector Illustration */}
-                <div className="md:col-span-5 bg-[#0f172a] border-t md:border-t-0 md:border-l border-slate-800 min-h-[220px]">
-                  {!failedImages['rotation'] ? (
-                    <img
-                      src={trafficRotationImg}
-                      alt="Ilustrasi antrean rotasi halaman website dan grafik pertumbuhan kunjungan"
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      decoding="async"
-                      onError={() => markImageFailed('rotation')}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center p-6">
-                      <BarChart3 className="w-10 h-10 text-emerald-400" />
-                    </div>
-                  )}
+                <div className="relative md:col-span-5 bg-[#0f172a] min-h-[220px]">
+                  <VwsColumnDivider visibleFrom="md" overhangPx={0} />
+                  <VwsTopLine bleed={false} className="md:hidden" />
+                  <div className="w-full h-full overflow-hidden">
+                    {!failedImages['rotation'] ? (
+                      <img
+                        src={trafficRotationImg}
+                        alt="Ilustrasi antrean rotasi halaman website dan grafik pertumbuhan kunjungan"
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
+                        onError={() => markImageFailed('rotation')}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center p-6">
+                        <BarChart3 className="w-10 h-10 text-emerald-400" />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
